@@ -1,0 +1,314 @@
+第一章
+移动价值链
+运营商
+移动浏览器市场份额
+操作系统厂商和软件
+
+
+
+
+
+
+
+
+
+第二章
+浏览器
+手机上有4种浏览器类型
+内置浏览器
+ios 					safari
+android 				安卓webkit/chrome
+黑莓					黑莓webkit
+windowsphone				IE
+塞班					塞班webkit
+firefox os				火狐
+
+
+
+可下载浏览器
+内置浏览器一般通过升级系统，可下载可以随时升级
+uc基于gecko（2014年）
+
+
+代理浏览器	opera mini、uc mini
+代理浏览器的渲染引擎能够解析执行html\css\js，但并不是运行在设备上，而是在浏览器上。为了给用户省钱（？）
+与代理浏览器相对应的是完备浏览器，它与我们预期的浏览器运行方式一样。会发请求、渲染，都在客户端上进行
+代理浏览器
+	1，用户请求页面不发送http请求，通过一个加密连接发送一个特殊情趣到一个特殊代理服务器
+	2，代理服务器会发送正常http请求给用户希望访问的web服务器，会请求html等资源
+	3，代理服务器包含一个渲染引擎，能够正常渲染页面
+	4，代理服务器压缩渲染的页面，成为该网站的某种图片，有链接热点，能选择文本和稍微放大
+	5，代理服务器同样通过加密连接把这个文件发到客户端
+	6，客户端把文件展示给用户。之后用户点击操作会重复这套步骤
+优点：
+	1，操作轻量级，可以跑在低规格手机上
+	2，客户端收到都是高度压缩的文件，节省移动数据传输
+缺点：
+	1，没有客户端交互
+	2，禁止scroll、resize、触摸等事件（专注click）
+
+
+webview
+webview是留给原声应用的一个操作系统浏览器接口
+webview是独立的程序，用了内置浏览器很多底层的组件（比如渲染引擎）
+
+
+
+混合浏览器（opera mobile、chrome）
+既可做完备浏览器也能做代理浏览器
+
+
+手机上4个渲染引擎
+gecko  trident  webkit  Blink(chrome从webkit分离出来)
+
+
+
+
+
+
+
+
+
+
+
+
+第三章
+安卓
+
+HTC安卓webkit为了适应屏幕对文字进行了重排
+任何chrome浏览器在它的用户代理字符串中都有chrome这个单词，而安卓webkit浏览器没有
+
+Blink是为html\css设计的渲染引擎，通常与v8js引擎配合使用。Blink是开源浏览器chromium精密集成在一起。chrome是谷歌对chromium的一个实现
+
+
+
+
+
+
+
+
+
+
+
+
+
+第四章
+视口
+布局视口（宽度远大于屏幕宽度）
+视觉视口（与设备屏幕一样宽）
+理想视口（对设备来说最理想的布局视口尺寸）
+
+<meta name='device' content='width=device-width'>
+布局视口宽度跟理想视口一致
+
+1，position:fixed;相对于视口的位置是固定的，不会随着滚动变化
+2，vw和vh单位是相对视口的百分比；100vw=100%
+
+
+<meta name='device' content='user-scalable=no'>
+禁止缩放
+
+js无法获取设备物理尺寸
+
+js有一个window.devicePixelRatio；css有device-pixel-ratio  单位dppx
+
+i4设备宽度是320个物理像素，理想视口宽度也是320个像素，因此设备像素比（DPR）是1
+后面iPhone宽度变成640个设备像素，理想视口还是320个像素，因此设备像素比变成2
+可以根据DPR决定是否使用高分辨率图片
+
+if(window.devicePixelRatio>=2){}//DPR大于等于2时执行
+@media all and (-webkit-min-device-pixel-ratio:2){}//DPR大于等于2时生效
+IE11以下不支持dppx，用dpi代替。1dppx等于96dpi
+@media all and ((-webkit-min-device-pixel-ratio:2),(min-resolution:192dpi)){}
+
+<meta name="viewport" content="name=value,name=value">
+1，width：设置布局视口的宽度为特定的值
+2，init-scale:设置页面的初始缩放程度和布局视口的宽度
+3，minimum-scale：设置了最小缩放程度（用户可缩小的程度）
+4，maximum-scale：设置了最大缩放程度（用户可放大的程度）
+5，user-scalable：是否阻止用户进行缩放
+
+<meta name="viewport" content="width=device-width">
+理想显示大小
+
+<meta name="viewport" content="width=400">
+布局视口任何情况宽度都是400px
+浏览器最大值是10000个像素，最小值约为理想视口的20%，安卓webkit不允许任何小于布局视口的宽度，指定了则转换默认布局视口。
+
+
+initial-scale指令设置了页面的初始缩放程度，1代表100%，2代表200%
+缩放程度与视觉视口的宽度是逆相关，越高的缩放程度意味着视觉视口越小。所以initial-scale=1时视觉尺寸和理想视口的尺寸一样，initial-scale=2会放大到200%，因此视觉视口的高宽是理想视口的一半。
+initial-scale有一个副作用，同时会将 布局视口的尺寸 设置为缩放后的尺寸。
+
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+布局视口在设备旋转的时候做出响应
+
+
+缩放程度根据理想视口计算出来，浏览器允许用户的缩放级别到5（20%-500%），设置后可扩大10（10%-100%）
+不支持更高缩放，安卓webkit不支持改变这个范围
+
+布局视口宽度小于或等于400px，屏幕方向为竖直，分辨率小于或等于1.5时候起作用。
+@media all and (max-width:400) and (orientation:portrait) and ( (max-resolution:144dpi),(-webkit-max-device-pixel-ratio:1.5) ){}
+因兼容问题，最后一个条件需要两个媒体查询，并且被一个逗号分隔（设备像素比小于或等于1.5，或分辨率小于或等于144dpi）
+
+device-width / height 总是使用screen.width / height 	避免使用
+
+device-pixel-ratio和分辨率
+@media all and ( (-webkit-min-device-pixel-ratio:1.5),(min-resolution:144dpi) ){}
+设备像素比大于等于1.5时的样式
+
+转向
+aspect-ratio和device-aspect-raido分别提供了布局视口的宽高比或screen.width/height的值，这个比例用分数表示，3/4或16/9
+
+视口属性，window.innerWidth / document.documentElement.clientWidth
+屏幕尺寸，screen.width
+
+
+window.devicePixelRatio，它没有单位，提供了屏幕的物理尺寸和理想视口的比例
+
+改变meta视口标签
+document.getElementsByTagName('meta')[0].setAttribute('content','width=400');
+
+orientationchange事件，只要用户改变设备方向，事件就会被触发。
+resize事件，只要视口尺寸改变，resize事件就被触发
+
+
+
+
+
+
+
+第五章
+css
+position:fixed存在兼容问题
+IE11 移动端position:device-fixed;
+
+overflow:auto;不适合移动端
+
+overflow-scrolling 更加平滑的滚动效果  -webkit-overflow-scrolling:auto
+
+background-attachment 移动浏览器无法支持过多的独立滚动层
+
+vh vw有兼容问题
+
+
+
+
+
+
+
+
+第六章
+触摸和指针事件
+触摸事件
+touchstart用户手指触摸屏幕的瞬间触发
+touchmove用户移动手指的过程中连续触发
+touchend用户手指离开屏幕的瞬间触发
+touchcancel含义取决于浏览器
+	（chrome在用户手指离开屏幕的瞬间触发touchcancel，其他浏览器没有，等同于touchend）
+
+手势事件
+Safari
+gesturestart、gesturechange、gestureend
+
+IE
+touchenter、touchleave
+
+
+微软认为没必要分出鼠标、触摸两种事件，统称为指针。
+addEventListener Method--pointerdown、pointermove、pointerup、pointerover、pointerout
+object.addEventListener("pointerdown", handler, useCapture)
+
+
+检测浏览器支持触摸事件	ontouchstart in window
+准确检测
+	var hasTouch=false;
+	document.ontouchstart=function(){hasTouch=true};
+	document.onpointerdown=function(e){if(e.pointerType==='touch'){hasTouch=true}}
+
+动作（action）
+用户采取的动作
+
+事件（event）
+响应用户操作的js事件
+
+事件级联（event cascade）
+响应用户操作的一系列事件。单指触摸动作会触发一个较长的事件级联
+
+事件处理器（event handler）
+用来执行事件的js代码
+
+
+Safari：取消事件级联
+	如果mouseover（因为下拉菜单问题）/mousemove事件引起了内容的改变（指dom发生变化，如appendchild，insertbefore，但是innerHTML不算。display的变化也算），Safari会取消后续的级联事件，并且不会触发mousedown、mouseup、click事件。
+Safari：鼠标事件冒泡
+	鼠标和click事件只在特定情况下才会冒泡到document（如目标元素是一个链接或者表单域，目标元素或祖先元素显示包含任意鼠标事件的处理函数，函数可以是空函数。目标元素或祖先元素包含cursor:pointer）
+	target.onclick=function(){};//这样所有事件都冒泡了
+
+300毫秒延时
+	touch-action:manipulation 让IE浏览器取消延时
+
+同一个像素
+	click事件只有当mousedown和mouseup事件在同一个像素触发后才被触发。
+
+touchlist
+	触摸事件对象有一个指针事件没有的特性：触摸事件有一个touchlist数组属性，包含了每个触摸点的信息
+	touches：当前触摸屏幕的触摸点数组
+	changedTouches：导致触摸事件被触发的触摸点数组
+	targetTouches：事件目标元素上的触摸点数组
+用户最后一个手指离开屏幕触发touchend事件，这个触摸点信息不会出现在touches或targetTouches数组中，但会出现在changedTouches数组中
+	//获取坐标
+	function handleTouch(){
+		var x,y;
+		if(e.changedTouches){
+			x=e.changedTouches[0].clientX;
+			y=e.changedTouches[0].clientY;
+		}else{
+			x=e.clientX;
+			y=e.clientY;
+		}
+		return [x,y];
+	}
+
+阻止默认行为
+return false; 或 e.preventDefault();对点击事件、触摸事件适用，对指针事件不起作用
+
+事件名和前缀
+el.onmspointermove=dosomething;el.addEventListener('MSPointerMove',doSomething,false);
+
+
+事件属性
+pointerType	mouse\touch\pen		指针类型
+isPrimary	true\false		当前指针是否主指针。鼠标指针和第一个触碰到屏幕的指针是主指针
+pressure	0.5			触摸的压力，压力从0到1。目前不支持所以是.5
+pointerId	整数			指针的ID。鼠标指针总是1，其他指针都会被分配一个唯一的ID
+width和height	1			指针的像素尺寸。目前设备不支持所以是1。手指按下所占像素区域宽高
+
+touch-action
+	touch-action:pan-y 操作系统处理垂直平移    垂直平移操作让操作系统处理，阻止其他触摸操作的默认行为。
+		     none  操作系统不处理任何触摸操作
+		     auto  操作系统处理所有触摸操作
+		     pan-x 操作系统处理水平平移
+		     pinch-zoom 操作系统处理多指缩放操作
+		     double-tap-zoom 操作系统处理双触（double-tap）缩放操作
+		     manipulation 操作系统处理除双触操作外的其他触摸操作（抑制触摸操作和click事件300ms延迟）
+
+touch-action:pinch-zoom pan-y double-tap-zoom让操作系统处理双触、多指缩放、垂直滑动，阻止水平平移
+
+
+
+
+
+
+
+
+第七章
+成为移动web开发者
+Ghostlab 需要再被测页面添加一段脚本
+adobe edge inspect同步你电脑上chrome浏览器操作到ios和安卓设备
+
+屏幕显示视口document.documentElement.clientWidth/Height
+
+
+	
