@@ -1,0 +1,988 @@
+第一部分作用域和闭包
+第一章
+作用域
+1.1编译原理
+js是一门编译语言
+传统编译语言的代码在执行前会经历三个步骤，统称为“编译”。
+分词/词法分析
+	这个过程将由字符组成的字符串分解成有意义的代码块，这些代码块被称为词法单元。
+	（如var a=2;词法单元：var、a、=、2、;）
+	
+	分词和词法分析区别是微妙的，主要差异在于词法单元的识别是通过有状态还是无状态的方式进行。
+	（如果词法单元生成器在判断a是一个独立的词法单元还是其他词法单元的一部分时，调用的是有状态的解析规则，那么这个过程被称为词法分析。） ???什么是有状态的解析规则???
+
+
+解析/语法分析
+	这个过程是将词法单元流（数组）转换成一个由元素逐级嵌套所组成的代表了程序的语法结构的树。（称为抽象语法树）
+	（var a = 2;的抽象语法树中可能会有一个VariableDeclaration的顶级节点，接下来是Identifier(值是a)的子节点，以及一个叫作AssignmentExpression的子节点。AssignmentExpression节点有一个叫作NumericLiteral(值是2)的子节点）
+
+
+代码生成
+	将AST转换为可执行代码的过程称为代码生成。???AST???
+	（简单说就是有某种方法可以将var a = 2;的AST转化为一组机器指令，用来创建一个叫作a的变量(包括分配内存等)，并将一个值储存在a中）
+
+js引擎不会有大量时间进行优化(跟其他语言编译器对比)，js的编译过程不是发生在构建之前。大部分情况下编译发生在代码执行之前的几微秒时间。js引擎用各种方法保证性能最佳(JIT,可以延迟编译甚至实施重编译)。先编译后执行
+
+
+
+
+1.2理解作用域
+引擎：从头到尾负责整个js程序的编译及执行过程
+编译器：负责语法分析及代码生成
+作用域：负责收集并维护由所有声明的标识符（变量）组成的一系列查询，并实施一套规则来确定当前执行代码对这些标识符的访问权限
+
+分解var a = 2;
+	1，遇到var a,编译器会询问作用域是否已经有一个该名称的变量存在于同一个作用域的集合中。如果是，编译器会忽略该声明，继续进行编译。否则它会要求作用域在当前作用域的集合中声明一个新的变量，命名为a
+	2，接下来编译器会为引擎生产运行时所需的代码，这些代码被用来处理a = 2这个赋值操作。引擎运行时会首先询问作用域，在当前的作用域集合中是否存在一个叫作a的变量。如果是，引擎就会使用这个变量；如果否，引擎会继续查找该变量
+	如果引擎最终找到a变量，就会将2赋值给它。否则引擎会抛出异常。
+总结：变量的赋值操作会执行两个动作，首先编译器会在当前作用域中声明一个变量（如果之前没有声明过），然后在运行时引擎会在作用域中查找该变量，找到就赋值。
+
+
+引擎会进行LSH、RSH查询。LSH查询是试图找到变量的容器本身，从而对其赋值。RSH查询与简单地查找某个变量的值差不多，可理解成取到它的源值。
+console.log(a)、var b=a中的a、var c=foo(2)的foo		RSH查询
+a=2、var b=a的b、var c=foo()的c		LSH查询
+function foo(){}函数声明不能理解为LSH，因为引擎执行代码时并不会有线程专门用来将一个函数值分配给foo。
+
+
+当一个块或函数嵌套在另一个块或函数中时，就发生了作用域的嵌套。
+遍历嵌套作用域链的规则：引擎从当前的执行作用域开始查找变量，如果找不到就向上一级查找。当抵达最外层全局作用域时，无论找没找到，查找过程都会停止。
+
+LSH如果在顶层(全局作用域)也无法找到目标变量，全局作用域中就会创建一个具有改名称的变量，并将其返回给引擎。（非严格模式下）
+RSH查询在所有嵌套的作用域中找不到所需变量，引擎就会抛出ReferenceError异常。
+RSH查询找到一个变量，尝试对这个变量进行不合理操作（如对一个非函数类型的值进行函数调用），会抛出TypeError
+
+
+
+
+
+
+
+
+
+
+第二章
+词法作用域
+词法作用域就是定义在词法阶段的作用域
+作用域查找会在找到第一个匹配的标识符时停止
+词法租用域查找只会查找一级标识符（比如a、b），如果代码引用了foo.bar，词法作用域查找只会试图查找foo标识符，找到后，对象属性访问规则会分别接管对bar的访问
+
+欺骗词法，js有两个机制实现但是会导致性能下降
+1,eval
+	在执行eval(...)之后的代码，引擎不 知道/在意 前面的代码是以动态形式插入，并对词法作用域的环境进行修改。引擎只会照常进行词法作用域查找。
+	（如：var b=2;foo('var b=3;');function foo(str){eval(str);console.log(b);}//3）eval会欺骗词法，永远无法找到外部的b。
+	
+	严格模式中eval在运行时有自己的词法作用域，无法修改所在的作用域。
+	setTimeout、setInterval第一个参数是字符串，字符串的内容可以被解释为一段动态生成的函数代码。
+	new Function(...)函数最后一个参数可以接受代码字符串，将其转化为动态生成的函数
+
+2，with
+	通常被当做重复引用同一个对象中的多个属性的快捷方式，可以不需要重复引用对象本身。
+	var o={a:1,b:2}; o.a=2;o.b=3; with(o){a=2;b=3} with里面直接获取/修改o的值
+
+	function foo(o){with(o){a=2;}} var o1={a:3}; var o2={b:3}; foo(o1); console.log(o1.a);//2 foo(o2); console.log(o2);//undefined console.log(a)//2
+	with里面变量a在o2里找不到，不会创建这个属性，o2.a保持undefined。向上找到window，自动给window赋值2。
+
+	with可以将一个没有或有多个属性的对象处理为一个完全隔离的词法作用域，因为这个对象的属性也会被处理为定义在这个作用域中的词法标识符
+	尽管with块可以将一个对象处理为词法作用域，但是这个块内部正常的var声明并不会限制在这个块的作用域中，而是被添加到with所处的函数作用域中
+	eval函数如果接受含有一个或多个声明的代码，就会修改其所处的词法作用域。
+	with声明实际上是根据你传递给它的对象凭空创建了一个全新的词法作用域。
+	
+	严格模式禁用with
+
+js引擎会在编译阶段进行数项性能优化，有些优化依赖于能够根据代码的词法进行静态分析，并预先确定所有变量和函数定义位置，才能在执行过程中快速找到标识符。如果引擎在代码中发现了eval或with，它只能简单假设关于标识符位置的判断都是无效的，因为无法在词法分析阶段明确知道eval会接受到什么代码，这些代码会对作用域进行什么修改，也无法知道with用来创建新词法作用域的对象到底是什么。
+
+
+
+
+
+
+
+
+
+
+
+
+第三章
+函数作用域和块作用域
+函数作用域的含义是指，属于这个函数的全部变量都可以在整个函数的范围内使用及复用。
+
+隐藏内部实现，函数内的变量如果没有特殊处理在函数外访问不了。可以规避命名冲突
+匿名和具名，匿名函数在栈追踪不会显示有意义的函数名，使得调用困难。匿名只能使用过期arguments.callee引用
+
+IIFE一种用途是倒置代码运行顺序，将需要运行的函数放在第二位，在IIFE执行之后当做参数传递进去。这种模式在UMD（universal module definition）项目中广泛使用
+var a=2;
+(function IIFE(def){
+	def(window);
+})(function def(global){
+	var a=3;
+	console.log(a);
+	console.log(global.a);
+});
+
+块作用域
+with从对象中创建出来的作用域仅在with声明中而非外部作用域中有效。
+try/catch的catch会创建一个块作用域
+es6 let；let没有声明提前
+	function ps(data){} var sa={}; ps(sa); var btn=document.getElementById('btn'); btn.addEventListener('click',functino click(evt){},false);
+	click函数的点击回调并不需要sa变量。理论上意味着ps执行后在内存中占用大量空间的数据结构就可以被垃圾回收了，但是由于click函数形成了一个覆盖整个作用域的闭包，js引擎极有可能保留这个结构（取决于具体实现）。
+
+	function ps(data){} {let sa={};ps();} var btn=document.getElementById('btn'); btn.addEventListener('click',function click(evt){},false);
+	块级作用域可以让引擎清楚地知道没必要继续保存sa；
+	
+
+
+
+
+
+
+
+
+
+
+第四章
+提升
+foo(); bar(); var foo=function bar(){};
+var foo; foo(); bar(); foo=function(){var bar=..self..};
+
+函数声明和变量声明都会被提升，函数会首先提升。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+第五章
+作用域闭包
+function foo(){
+	var a=2;
+	function bar(){
+		console.log(a);
+	}
+	return bar;
+}
+var bar=foo();
+baz();//访问到内部变量a
+foo执行后通常会期待foo整个内部作用域都被销毁。但是bar在使用foo内部作用域，所以不会被回收。
+
+function wait(m){
+	setTimeout(function timer(){console.log(m);},1000);
+}
+wait('hello');
+wait执行1秒后它的内部作用域不会消失，timer函数依然有wait作用域的闭包。
+使用了回调函数实际上就是使用闭包
+
+for(var i=0;i<3;i++){
+	(function(i){
+		setTimout(function(){
+			console.log(i);
+		},i*1000);
+	})(i);
+}
+在迭代内使用IIFE会为每个迭代都生成一个新的函数作用域，是的延迟函数的回调可以将新的作用域封闭在每个迭代内部，每个迭代中都会含有一个具有正确值的变量供我们访问。
+
+for(var i=1;i<3;i++){
+	let j=i;//闭包的块级作用域
+	setTimeout(function timer(){
+		console.log(j);
+	},j*1000)
+}
+
+
+这个模式在JS中被称为模块
+function ce(){
+	var sg='cool';
+	var ar=[1,2,3];
+	function dg(){
+		console.log(sg);
+	}
+	function dr(){
+		console.log(ar.join('!'));
+	}
+	return {
+		dg:dg,dr:dr
+	}
+}
+var foo=ce();foo.dg();foo.dr();
+1，必须有外部的封闭函数，该函数必须至少调用一次
+2，封闭函数必须返回至少一个内部函数，这样内部函数才能在私有作用域中形成闭包，并且可以访问或修改私有状态
+
+
+现在的模块机制
+var Ms=(function mr(){
+	var ms={};
+	function define(name,d,impl){
+		for(var i=0;i<d.length;i++){
+			d[i]=ms[d[i]];
+		}
+		ms[name]=impl.apply(impl,d);
+	}
+	function get(name){
+		return ms[name];
+	}
+	return {
+		define:define,
+		get:get
+	};
+})();
+核心是ms[name]=impl.apply(impl,d)；为了模块的定义引入了包装函数（可以传入任何一来），并且将返回值，也就是模块的API
+
+MS.define('bar',[],function(){
+	function hello(who){
+		return 'let me'+who;
+	}
+	return {
+		hello:hello
+	};
+});
+Ms.define('foo',['bar'],function(bar){
+	var hungry='hippo';
+	function awesome(){
+		console.log(bar.hello(hungry).toUpperCase());
+	}
+	return {
+		awesome:awesome
+	};
+});
+var bar=Ms.get('bar');
+var foo=Ms.get('foo');
+console.log(bar.hello('hippo'));
+foo.awesome();
+
+ES6模块API是静态的（api不会再运行时改变）。编译器在编译期检查对导入模块的API成员的引用是否真实存在，如果api引用不存在，编译器会在编译时就抛出错误，不会等到运行期在动态解析。
+
+import可以将一个模块中的一个或多个api导入到当前作用域中，并分别绑定在一个变量上。
+module会将整个模块的api导入并绑定到一个变量上。
+export会将当前模块的一个标识符（变量，函数）导出为公共api
+
+js不具有动态作用域，只有词法作用域。
+词法作用域实在写代码或者定义时确定的，而动态作用域时在运行时确定的。
+
+try/catch性能不好
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+第二部分
+this和对象原型
+
+第一章
+关于this
+
+function foo(){
+	this.c++;
+}
+foo.c=0;
+foo();
+this指向window
+
+foo.call(foo,i);
+this指向foo
+
+
+
+
+
+
+
+第二章
+this解析
+
+严格模式下不会默认绑定到window，绑定到undefined
+
+对象属性引用链中只有上一层或者说最后一层在调用位置中起作用：
+function foo(){
+	console.log(this.a);
+}
+var obj2={a:2,foo:foo};
+var obj1={a:1,obj2:obj2};
+obj1.obj2.foo();//2
+
+
+隐式绑定规则会把函数调用中this绑定到这个上下文对象。
+function foo(){
+	console.log(this.a);
+}
+var obj={
+	a:2,
+	foo:foo
+};
+var bar=obj.foo;//指到window
+var a='global';
+bar();
+
+
+------------------------------------
+function foo(){
+	console.log(this.a);
+}
+function dofoo(fn){//var fn=obj.foo
+	fn();
+}
+var obj={
+	a:2,
+	foo:foo
+};
+var a='global';
+dofoo(obj.foo);//指向window
+
+setTimeout(obj.foo,100);//window
+
+
+js的setTimeout函数实现与下面的伪代码类似：
+function setTimeout(fn,delay){
+	fn();//等待delay毫秒
+}
+
+
+显示调用call,apply
+如果call、apply传入一个原始值（字符串、布尔、数字类型）来当做this的绑定对象，这个原始值会被转换为它的对象形式（new String\Boolean\Number）。通常称为“装箱”
+
+bind
+function foo(something){
+	return this.a+something;
+}
+function bind(fn,obj){
+	return function(){
+		return fn.apply(obj,arguments);
+	}
+}
+var obj={a:2};
+var bar=bind(foo,obj);
+var b=bar(3);
+
+
+
+api调用的上下文
+function foo(el){
+	console.log(el,this.id);
+}
+var obj={
+	id:"ae"
+};
+[1,2,3].forEach(foo,obj);
+//1 ae 2 ae 3 ae
+
+
+
+new 绑定
+包括内置对象函数在内的所有函数都可以用new来调用，这种函数调用被称为构造函数调用。（实际上不存在所谓的构造函数，只有对于函数的构造调用）
+使用new来调用函数，或者说发生构造函数调用时，会自动执行：
+1，创建（构造）一个全新的对象
+2，这个新对象会被执行[[prototype]]
+3, 这个新对象会绑定到函数调用的this
+4，如果函数没有返回其他对象，那么new表达式中的函数调用会自动返回这个新对象
+
+
+new绑定比隐式绑定优先级高
+new可以改bind的this 
+
+function foo(s){ this.a=s; }
+var obj1={};
+var bar=foo.bind(obj1);
+bar(2);console.log(obj1.a);//2
+var baz=new bar(3);
+console.log(obj1.a);//2
+console.log(baz.a);//3 new 出来的是一个新对象，改变了新对象的a，没有改变bind的a
+
+
+new中使用硬绑定函数，主要目的是预先设置函数的一些参数，这样使用new进行初始化时就可以只传入其余的函数
+
+柯里化
+function foo(p1,p2){
+	this.val=p1+p2;
+}
+var bar=foo.bind(null,"p1");
+var baz=new bar("p2");
+baz.val//p1p2
+
+判断this
+1，函数在new中调用，this绑定的是新创建的对象
+2，函数通过call、apply或者硬绑定，this绑定的是指定的对象
+3，函数在上下文对象中调用，this绑定的是那个上下文
+4，默认绑定严格模式下绑定undefined，否则绑定到全局对象
+
+传入null、undefined作为硬绑定的值，实际使用默认绑定规则
+function foo(a,b){
+	console.log(a+b);
+}
+foo.apply(null,[2,3]);//a:2,b:3
+//使用bind进行柯里化
+var bar=foo.bind(null,2);
+bar(3);//a:2,b:3
+
+
+传入一个特殊对象，把this绑定到这个对象不会对你的程序产生任何副作用。DMZ对象，一个空的非委托对象
+Object.create(null)跟{}类似，但不会创建Object.prototype这个委托。
+function foo(a,b){
+	console.log(a+b);
+}
+var nul=Object.create(null);
+foo.apply(nul,[2,3]);//a:2,b:3
+var bar=foo.bind(nul,2);
+bar(3);//a:2,b:3
+
+
+间接引用（0 ，eval）
+function foo(){
+	console.log(this.a);
+}
+var a=2;
+var o={a:3,foo:foo};
+var p={a:4};
+o.foo();//3
+(p.foo=o.foo)();//2
+
+赋值表达式p.foo=o.foo的返回值是目标函数的引用，因此调用位置是foo而不是p.foo。
+
+
+
+软绑定
+使用硬绑定之后无法使用隐式绑定或者显示绑定修改this。给默认绑定指定一个全局对象和undefined之外的值，就可以实现和硬绑定相同的效果，同时保留隐式绑定或者显示绑定修改this的能力
+
+
+
+
+
+
+
+
+
+
+第三章
+对象
+
+不同的对象在底层都表示为二进制，在js中二进制前三位都为0的话会被判断为object类型，null的二进制表示是全0，前三位自然是0，所以typeof返回object
+
+内置对象
+string number boolean object function array date regexp error（很像java的string类）
+
+原始值'str'不是一个对象，只是一个字面量，不可变的值。进行字符串操作时会自动转为一个string对象
+'str' instanceof String;//false
+new String('str') instanceof String/Object; //true
+
+41.2.toFixed(2) 自动换成 new Number(41)
+
+null,undefined没有构造形式只有文字形式，Date只有构造没有文字形式
+
+
+在对象中，属性名永远是字符串，如果使用string字面量之外的其他值作为属性名，那么它首先会转换为一个字符串
+
+ES6增加了可计算属性名：
+var p="foo";
+var myo={
+	[p+'b']:'h1',
+	[p+'c']:'h2'
+};
+myo['pb']//h1	myo['pc']//h2
+
+
+ES6增加了super引用，super的行为似乎更有理由把super绑定的函数成为方法。
+
+
+function anotherFucntion(){}
+var anotherObject={c:true};
+var anotherArray=[];
+var myObject={a:2,b:anotherObject,c:anotherArray,d:anotherFunction};//都是引用，主体变了，引用的跟着变
+anotherArray.push( anotherObject , myObject );
+
+浅拷贝，复制出的新对象中a的值会复制旧对象中a的值，也就是2，新对象b、c、d三个属性只是三个引用。
+深复制除了了复制myObject以外还会复制anotherObject和anotherArray，这样会导致死循环！循环引用了！
+anotherArray里面的myObject的c会继续展开一直循环
+
+
+对于json安全（也就是可以被序列化为一个json字符串并且可以根据这个字符串解析出一个结构和值完全一样的对象）的对象来说有一种复制方法：
+var newo= JSON.parse(JSON.stringify(obj))
+
+ES6定义Object.assign实现浅复制
+Object.assign方法的第一个参数是目标对象，之后可以跟一个或多个源对象。它会遍历一个或多个源对象的所有可枚举的自有键并把它们复制(使用=操作符赋值)到目标对象
+（还是引用，=操作符）
+
+
+属性描述符
+Object.getOwnPropertyDescriptor(obj,'prop')
+
+修改属性描述符
+Object.defineProperty
+1，writable是否可以修改属性的值（严格模式下修改writable为false的值会报错）
+2，configurable属性是可配置就可以使用defineProperty来修改（修改configurable为false会报错，把configurable改false是单向操作。即使configurable:false还是可以把writable的状态由true改成false）
+3，enumerable表示是否可以枚举，enumerable:false则无法for in循环，但能访问。
+
+不变性
+1，对象常量
+结合writable:false和configurable:false就可以创建一个真正的常量属性
+2，禁止扩展
+禁止一个对象添加新属性并且保留已有属性，可以使用Object.preventExtensions
+var myObj={a:1};
+Object.preventExtensions(myObj);
+myObj.b=2;console.log(myObj);//undefined 严格模式会报TypeError
+3，密封
+Object.seal会创建一个密封对象，这个方法实际上会在一个现有对象上调用Object.preventExtensions，并把所有现有属性标记configurable:false。
+密封之后不能添加新属性、不能重新配置或者删除任何现有属性（可以修改属性的值）
+4，冻结
+Object.freeze会创建一个冻结对象，这个对象实际上会调用Object.seal并把所有“数据访问”属性标记为writable:false，这样就无法修改它们的值
+
+
+[[Get]]
+var myobj={a:2};
+myobj.a//2
+myobj.a在myobj上实际上是实现了[[Get]]操作（类似函数调用：[[Get]]()）。对象默认的内置[[get]]操作首先在对象中查找是否有名称相同的属性，找到就返回这个值。
+没有找到会向上找prototype，都没有找到返回undefined
+
+[[Put]]
+如果存在访问属性
+1，属性是否是访问描述符，如果是并且存在setter就调用setter
+2，属性的数据描述符中writable是否是false，如果是，在非严格模式下静默失败，严格模式下报错
+3，如果都不是，将该值设置为属性的值
+如果不存在这个属性
+
+
+getter、setter
+es5可以使用getter和setter部分改写默认操作，只能应用在单个属性上，无法应用在整个对象上，getter是一个隐藏函数，在获取属性值时调用。setter是一个隐藏函数，在设置属性值时调用
+当给一个属性定义getter、setter时，这个属性会被定义为“访问描述符”（和数据描述符相对），对于访问描述符来说，js会忽略它们的value和writable特性，取而代之是关心set和get(configurable和enumerable)特性
+
+var myobj={
+	get a(){return 2;}
+};
+Object.defineProperty(
+	myobj,//目标对象
+	"b",//目标属性
+	{
+		get:function(){return this.a*2},
+		enumrable:true
+	}
+);
+myobj.a//2
+myobj.b//4
+
+var myobj={get a(){return 2;}};
+myobj.a=3//赋值会被忽略
+myobj.a//2
+
+
+在不访问属性的情况下判断对象是否存在这个属性：
+var myobj={a:2};
+"a" in myobj
+
+myobj.hasOwnProperty("a");
+
+in操作符会检查属性是否在对象及其[[prototype]]原型链中。
+hasOwnProperty只检查属性是否在myobj对象中，不会检查原型链
+
+普通对象都可以通过对于Object.prototype的委托来访问hasOwnProperty，通过object.create(null)创建使用myobj.hasOwnProperty就会失败。
+可以使用Object.prototype.hasOwnProperty.call(myobj,"a")，它借用基础的hasOwnProperty方法并把它显示绑定到myobj上
+
+1，枚举
+可枚举相当于可以出现在对象属性的遍历中。 enumerable为false，值能访问但是for in不会出现
+
+数组上应用for in不仅会包含所有数值索引，还会包含所有可枚举属性。所以for in只用在对象上
+
+var myobj={};
+Object.defineProperty(
+	myobj,
+	"a",
+	{enumerable:true,value:2}
+);
+Object.defineProperty(
+	myobj,
+	"b",
+	{enumerable:false,value:3}
+);
+
+myobj.propertyIsEnumerable("a");//true
+myobj.propertyIsEnumerable("a");//false
+
+Object.keys(myobj);//["a"]
+Object.getOwnPropertyNames(myobj);//["a","b"]
+
+propertyIsEnumerable会检查给定的属性名是否直接存在于对象中（而不是在原型链上）并且满足enumerable：true
+Object.keys会返回一个数组，包含所有可枚举属性，Object.getOwnPropertyNames会返回一个数组，包含所有属性，无论是否可枚举
+in和hasOwnProperty区别在于是否查找prototype链，Object.keys和Object.getOwnPropertyNames都只会查找对象直接包含的属性
+
+遍历
+forEach会遍历数组中所有值并忽略回调函数的返回值
+every会一直运行直到回调函数返回false
+some会一直运行直到回调函数返回true
+every和some中特殊的返回值和普通for循环的break语句类似，会提前终止遍历
+
+直接遍历值，而不是下标
+var myarr=[1,2,3]
+for(var v of myarr){
+	console.log(v);//1,2,3
+}
+
+for of 循环首先会被访问对象请求一个迭代器对象，然后通过调用迭代器对象的next()方法来遍历所有返回值
+数组有内置的@@iterator因此数组可以直接用for of
+
+var myarr=[1,2,3]
+var it = myarr[Symbol.iterator]();
+it.next()//{value:1,done:false}
+it.next()//{value:2,done:false}
+it.next()//{value:3,done:false}
+it.next()//{done:true}
+
+使用es6的符号symbol.iterator来获取对象的@@iterator内部属性。引用类似iterator的特殊属性时要使用符号名，而不是符号包含的值。
+虽然看起来像对象，但@@iterator本身并不是一个迭代器对象，而是一个返回迭代器对象的函数。
+
+
+给任何想遍历的对象定义@@iterator
+var myobj={a:2,b:3};
+Object.defineProperty(myobj,Symbol.iterator,{
+	enumerable:false,
+	writable:false,
+	configurable:true,
+	value:function(){
+		var o=this;
+		var idx=0;
+		var ks=Object.keys(o);
+		return {
+			next:function(){
+				return {
+					value:o[ks[idx++]],
+					done:(idx>ks.length)
+				};
+			}
+		};
+	}
+});
+
+//手动遍历myobj
+var it=myobj[Symbol.iterator]();
+it.next();//{value:2,done:false}
+it.next();//{value:3,done:false}
+it.next();//{value:undefined,done:true}
+
+//for of 遍历myobj
+for(var v of myobj){
+	console.log(v);//2,3
+}
+
+使用object.defineProperty定义了我们自己的@@iterator（主要是让它不可枚举）。把符号当做可计算属性名
+定义对象直接声明 var myobj={a:2,[Symbol.iterator]:function(){}}
+
+
+var randoms={
+	[Symbol.iterator]:function(){
+		return {
+			next:function(){
+				return {value:Math.random()};
+			}
+		}
+	}
+};
+var randoms_pool=[];
+for(var n of randoms){
+	randoms_pool.push(n);
+	if(randoms_pool.length===100)break;//防止死循环
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+第四章
+混合对象“类”
+
+面向对象编程强调的是数据和操作数据的行为本质上是互相关联的，因此好的设计是把数据以及和它相关的行为打包（封装）起来。这在计算机科学有时被称为数据结构
+
+用来表示一个单词的一串字符通常被称为字符串，往往我们不关心数据是什么，而是可以对数据做什么，所有可以应用在这种数据上的行为都被设计成String类的方法。
+所有字符串都是string类的一个实例，也就是说它是一个包裹，包含字符数据和我们可以应用在数据上的函数。
+
+类实例是由一个特殊的类方法构造的，这个方法通常和类名相同，被称为构造函数。
+
+js中函数无法（用标准、可靠的方法）真正地复制，所以你只能复制对共享函数对象的引用。
+
+
+
+
+
+
+
+
+
+
+第五章
+原型
+js中对象有一个[[Prototype]]内置属性，其实就是对于其他对象的引用。
+所有普通的[[Prototype]]链最终都指向内置的Object.prototype
+
+属性名foo既出现在myobj中也出现在myobj的[[Prototype]]链上层，那就会发生屏蔽，myobj中foo属性会屏蔽原型链上的foo属性
+如果foo不直接存在于myobj中而是存在于原型链上层时myobj.foo="bar"会出现三种情况
+1，如果[[Prototype]]链上层存在名为foo的普通数据访问属性并且没有被标记为只读，那就直接在myobj中添加一个名为foo的新属性，它是屏蔽属性
+function a9(){} a9.prototype.a=11; var a99=new a9; a99.a=44;console.log(a99.a);//44
+
+
+2，如果在[[Prototype]]链上层存在foo，但它被标记为只读，那么无法修改已有属性或者myobj上创建屏蔽属性。（严格模式下抛错）
+Object.defineProperty(a99,"a",{writable:false})
+;a99.a=33;console.log(a99.a)
+;//44
+
+3，如果在[[Prototype]]链上层存在foo并且它是一个setter，那就一定会调用setter，foo不会被添加到myobj，也不会重新定义setter
+
+如果2,3情况也屏蔽foo，那就不能用=等号赋值，而是使用Object.definePrototype来加foo
+
+
+
+对象有__prototype__
+函数有prototype
+
+
+隐式屏蔽
+var anotherObject={a:2};
+var myobject=Object.create(anotherObject);
+anotherObject.a;//2
+myobject.a;//2
+
+anotherObject.hasOwnProperty('a');//true
+myobject.hasOwnProperty('a');//false
+
+myobject.a++;//隐式屏蔽
+
+anotherObject.a;//2
+myobject.a;//3  ++操作相当于myobject.a=myobject.a+1，因此++操作首先会通过[[Prototype]]查找属性a并从anotherObject.a获取当前属性值2，然后给这个值加1，接着用[[Put]]将值3赋给myobject中新建的屏蔽属性a
+
+myobject.hasOwnProperty('a');//true
+
+
+
+所有函数默认都会拥有一个名为prototype的公有且不可枚举的属性，它会指向另一个对象
+function Foo(){} Foo.prototype;//{}
+这个对象通常被称为Foo的原型
+
+function Foo(){}
+var a=new Foo();
+Object.getPrototypeOf(a)===Foo.prototype;//true
+
+调用new Foo()时会创建a，其中一步是将a内部的[[Prototype]]链接到Foo.prototype所指向的对象
+
+
+
+function Foo(){}
+Foo.prototype.constructor===Foo;//true
+var a=new Foo();
+a.constructor === Foo;
+a.constructor是通过默认的[[Prototype]]委托指向Foo，委托给Foo.prototype
+
+js中对于构造函数最准确的解释是，所有带new的函数调用
+函数不是构造函数，当且仅当使用new时，函数调用会变成“构造函数调用”
+
+function Foo(){}
+Foo.prototype={}//创建一个新原型对象
+var a1=new Foo();
+a1.constructor===Foo;//false
+a1.constructor===Object;//true
+
+可以手动给Foo.prototype添加一个.constructor属性，需要手动添加一个符合正常行为的不可枚举属性
+Obejct.define(Foo.prototype,"constructor",{enumerable:false,writable:true,configurable:true,value:Foo});
+
+对象的.constructor会默认指向一个函数，这个函数可以通过对象的.prototype引用。constructor并不表示被构造
+.constructor并不是一个不可变属性，它是不可枚举，但它的值是可写的。可以给任意[[Prototype]]链中的任意对象添加一个名为constructor的属性或者对齐修改。
+所以constructor是个非常不可靠并且不安全的引用
+
+
+
+原型风格
+function Foo(name){this.name=name;}
+Foo.prototypef.myName=function(){
+	return this.name;
+};
+function Bar(name,label){
+	Foo.call(this,name);
+	this.label=label;
+}
+Bar.prototype=Object.create(Foo.prototype);
+Bar.prototype.myLabel=function(){
+	return this.label;
+};
+var a = new Bar("a","obj a");
+a.myName();//"a"
+a.myLabel();//"obj a"
+
+
+ES6之前
+Bar.prototype=Object.create(Foo.prototype);
+
+ES6之后
+Object.setPrototypeOf(Bar.protype,Foo.protype);
+
+
+
+检查一个实例的继承祖先通常被称为内省
+function Foo(){}
+Foo.prototype.blah='';
+var a=new Foo();
+
+通过内省找出a的“祖先”
+a instanceof Foo;//true
+instanceof 操作符左边是普通对象，右变是函数。a的整条[[Prototype]]链中是否有指向Foo.prototype的对象
+该方法只能处理对象和函数之间的关系，只通过instanceof无法判断两个对象是否通过[[Prototype]]链关联
+
+Foo.prototype.isPrototypeof(a);//true
+在a的整条[[Prototype]]链中是否出现过Foo.prototype
+
+
+获取一个对象的[[Prototype]]链
+Object.getPrototypeOf(a)===Foo.prototype//true
+a.__proto__===Foo.protype
+
+.__protot__大致实现
+Object.defineProperty(Object.prototype,"__proto__",{
+	get:function(){
+		return Object.getPrototypeOf(this);
+	},
+	set:function(o){
+		Object.setPrototypeOf(this,o);
+		return o;
+	}
+});
+访问a.__proto__时，实际上调用了a.__proto__()（调用getter函数）
+
+
+
+Object.create ES5 polyfill
+if(!Object.create){
+	Object.create=function(o){
+		function F(){}
+		F.prototype=o;
+		return new F();
+	};
+}
+
+
+
+Object.create
+
+语法
+Object.create(proto, [ propertiesObject ])
+
+参数
+proto
+一个对象，应该是新创建的对象的原型。
+
+propertiesObject
+可选。该参数对象是一组属性与值，该对象的属性名称将是新创建的对象的属性名称，值是属性描述符（这些属性描述符的结构与Object.defineProperties()的第二个参数一样）。注意：该参数对象不能是 undefined，另外只有该对象中自身拥有的可枚举的属性才有效，也就是说该对象的原型链上属性是无效的。
+
+有观点认为ES3的Object.create polyfill无法完全模拟ES5的Object.create，所以名字不应该是Object.create，应该是createAndLinkObject之类的
+
+
+var anotherObject={
+	cool:function(){
+		console.log('cool');
+	}
+};
+var myobject=Object.create(anotherObject);
+myObject.cool();
+这样比较难维护
+
+var anotherObject={
+	cool:function(){
+		console.log('cool');
+	}
+};
+var myobject=Object.create(anotherObject);
+myobject.doCool=function(){
+	this.cool();//内部委托
+};
+myObject.doCool();
+内部委托比起直接委托可以让API接口设计更加清晰
+
+
+
+
+
+
+
+
+
+
+
+
+第六章
+行为委托
+[[Prototype]]机制就是指对象中的一个内部链接引用另一个对象，如果在第一个对象上没有找到需要的属性或者方法引用，引擎就会继续在[[Prototype]]关联的对象上进行查找，这一系列对象的链接被称为原型链。js中这个机制的本质就是对象之间的关联关系
+
+原型风格
+function Foo(who){ this.me=who; }
+Foo.prototype.identify=function(){
+	return 'i am'+this.me;
+};
+function Bar(who){
+	Foo.call(this,who);
+}
+Bar.prototype=Objedct.create(Foo.prototype);
+
+Bar.prototype.speak=function(){
+	console.log('hello'+this.identify());
+};
+var b1=new Bar('b1');
+var b2=new Bar('b2');
+b1.speak();
+b2.speak();
+
+
+对象关联风格
+Foo={
+	init:function(who){
+		this.me=who;
+	},
+	identify:function(){
+		return 'i am'+this.me;
+	}
+};
+Bar=Object.create(Foo);
+Bar.speak=function(){
+	console.log('hello'+this.identify());
+};
+var b1=Object.create(Bar);
+b1.init('b1');
+var b2=Object.create(Bar);
+b2.init('b1');
+b1.speak();
+b2.speak();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                
