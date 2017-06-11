@@ -1,0 +1,237 @@
+react
+第一章
+简介
+
+第二章
+JSX
+{}花括号
+var t="txt";<h2>t</h2>
+
+子节点
+React将开始标签与结束标签之间的所有子节点保存在一个名为this.props.children的特殊组件属性中
+组件的所有子节点
+this.props.children 的值有三种可能：
+如果当前组件没有子节点，它就是 undefined ;如果有一个子节点，数据类型是 object ；如果有多个子节点，数据类型就是 array 。
+React 提供一个工具方法 React.Children 来处理 this.props.children 。
+我们可以用 React.Children.map 来遍历子节点，而不用担心 this.props.children 的数据类型是 undefined 还是 object
+
+class NotesList extends React.Component{
+    render() {
+      return (
+        <ol>
+          {
+            React.Children.map(this.props.children, function (child) {
+              return <li>{child}</li>;
+            })
+          }
+        </ol>
+      );
+    }
+}
+
+    <NotesList>
+      <span>hello</span>
+      <span>world</span>
+    </NotesList>
+
+输出被ol li span 包着的hello world
+
+jsx中使用三目运算符
+<div className={this.state.boo ? 'a' : 'b'}>
+使用变量
+const a='a'; <div className={a}>
+使用函数
+const a=()=>{return 'a'} <div className={a}>
+使用运算符
+<div className={this.state.boo&&'a'}>
+
+jsx
+key是一个可选的唯一标识符。通过给组件设置一个独一无二的键，并确保它在一个渲染周期中保持一致，使得react能够更智能地决定应该重用一个组件还是销毁一个组件，进而提升渲染性能
+http://taobaofed.org/blog/2016/08/24/react-key/?utm_source=tuicool&utm_medium=referral
+
+ref允许父组件在render方法之外保持对子组件的一个引用
+可以使用this.refs.myref.getDOMNode()访问真是的DOM节点
+
+dangerouslySetInnerHTML 设置原始的HTML，将HTML内容设置为字符串
+render(){
+	const htmlStr={__html:"<span>an html string</span>"}
+	return <div dangerouslySetInnerHTML={htmlstr}></div>
+}
+
+
+
+事件
+驼峰命名
+
+注释
+子节点
+{/*可以跨多行*/}
+
+内联属性里
+<input /*input zhushi*/ />
+
+特殊属性
+html中for  jsx的htmlFor
+
+样式
+驼峰形式的属性及css值拼接为对象即可。 const styles={borderColor:"#999"}  style={styles}
+
+没有JSX的react，需要：
+1，定义组件类
+2，创建一个为组件类产生实例的工厂
+3，使用工厂来创建ReactElement实例
+
+创建react元素
+对于普通的HTML元素，react在React.DOM.*命名空间下提供了一系列的工厂
+React.createElement('div') = React.DOM.div()
+
+实例化
+首次使用一个组件类时，顺序调用
+getDefaultProps
+getInitialState
+componentWillMount
+render
+componentDidMount
+
+后续应用
+getInitialState
+componentWillMount
+render
+componentDidMount
+
+存在期 应用状态改变
+componentWillReceiveProps
+shouldComponentUpdate
+componentWillUpdate
+render
+comonentDidUpdate
+
+销毁&清理期
+当组件被使用完成后，componentWillUnmount方法将会被调用，目的是给这个实例提供清理自身的机会
+
+实例化 当组件首次渲染时
+getDefaultProps
+对组件类来说，这个方法只会被调用一次，对于那些没有被父辈组件指定props属性的新建实例来说，这个方法返回的对象可用于为实例设置默认的props值
+
+getInitialState
+调用一次。与defaultProps不同的是，每次实例创建时该方法都会被调用一次。这个方法已经可以访问到this.props
+
+componentWillMount
+该方法会在首次渲染之前调用。render前修改组件state的最后一次机会
+
+render
+创建虚拟DOM，表示组件的输出
+只能通过this.props和this.state访问数据
+可以返回null、false或者任何react组件
+只能出现一个顶级组件
+纯函数，不能改变组件状态或者修改DOM输出
+
+componentDidMount(服务器端不会被调用)
+在render方法成功调用并且真实的DOM被渲染后，可以通过this.getDOMNode()
+
+存在期
+组件渲染好并且用户可以与它进行交互
+
+componentWillReceiveProps
+在任意时刻，组件的props都可以通过父辈组件来更改。出现这种情况componentWillReceiveProps方法会被调用，同时可以更改props及state的机会。  componentWillReceiveProps:function(nextProps){}
+
+shouldComponentUpdate
+让react更快，调用shouldComponentUpdate在组件渲染时进行精确优化
+如果确定某个组件或者它的任何子组件不需要渲染新的props或者state，则该方法返回false
+在首次渲染期间或者调用了forceUpdate方法后，该方法不会被调用
+使用不可变的数据结构作为state同时只在render方法读取props和state的数据，那可以放心重写shouldComponentUpdate方法来比较新旧props及state
+react插件提供的PureRenderMixin方法，如果对于相同的state、props总渲染一样的DOM，那么这个mixin会自动调用shouldComponentUpdate方法来比较props和state，结果一致则返回false
+返回false就是告诉react不要调用组件的渲染方法，并使用之前渲染好的虚拟DOM
+返回true就是让react调用组件的渲染方法并计算新的虚拟dom，默认返回true
+接收两个参数，新的props和新state	nextProps, nextState
+
+componentWillUpdate
+组件在接受新的props、state进行渲染之前调用。不可在该方法中更新state、props，用componentWillReceiveProps。
+
+componentDidUpdate
+可以更新已经渲染好的DOM
+
+销毁&清理期
+当react使用完一个组件，组件必须从DOM中卸载随后销毁。仅有一个钩子函数会做出响应，完成所有清理和销毁工作
+
+componentWillUnmount
+该方法在组件被移除之前调用，在componentDidMount添加的任务都需要再该方法中撤销
+
+反模式：把计算后的值赋给state
+在getInitalState中，尝试通过this.props来创建state的做法是一种发模式
+在组件中，把日期转化为字符串形式，或者渲染前将字符串转为大写，这些都不是state只能渲染时进行计算
+当组件的state值和它所给予的prop不同步，因而无法了解到render函数的内部结构时，可以认定为一种发模式
+正确模式应该是在渲染时计算值，保证计算后的值永远不会与派生出它的props值不同步
+初始化state可以在getInitialState方法中使用props
+
+
+数据流
+props
+var listC = React.render(<Com />,document.querySelect('body'));listC.setProps({val:val})
+只能在子组件或者组件树外调用setProps
+
+使用JSX的展开语法把props设置成一个对象
+render(){
+	const props={a:'a'};return <Com {...props}/>
+}
+
+props还可以用来添加事件处理器，onClick等
+
+propTypes
+验证props的方式
+React.createClass({
+	propTypes:{
+		survey:React.PropType.shape({
+			id:React.PropTypes.number.isRequired
+		}).isRequired,
+		onClick:React.PropTypes.func
+	}
+})
+组件初始化时，如果传递的属性和propTypes不匹配，则会打印一个console.warn日志
+
+getDefaultProps
+可以为组件添加getDefaultProps函数来设置属性的默认值。
+getDefaultProps不是在实例化时被调用，而是在React.createClass调用时就被调用了，返回值会被缓存起来。
+不能再getDefaultProps中使用任何特定的实例数据
+
+state
+每一个react组件都可以拥有自己的state，state与props的区别在于前者只存在组件的内部
+只要setState被调用，render就会被调用，dom就会更新
+getInitialState初始化state值
+
+更新组件状态两种方案
+setState
+replaceState 用一个全新的state对象完整地替换原有的state
+
+mixin为了解决代码重用，es6将不支持
+mixins:[{getInitalState:fn}]
+
+React高阶组件替代Mixins
+能够包裹组件的组件， 并通过一些额外的功能来增强组件，这样的组件我们称之为高阶组件
+引入高阶组件IntervalEnhance。
+export高阶组件包装增强后的CartItem
+
+
+
+假设div组件key属性为'foo'，后续改成'bar'，那么react会跳过DOM diff，同时完全弃置div所有子元素，并重新从头渲染
+key值在组件内无法获取到，基于排序的项目可以用上
+
+
+服务端渲染
+react提供了两个可用于服务端渲染组件的函数
+react.renderToString(server主要使用，同步阻塞式的函数)
+与render不同，去掉了表示渲染位置的参数，该函数只返回一个字符串。
+data-react-checksum是已创建dom的校验和，准许react在客户端服用服务端结构上相同的dom结构，该属性只会添加到根元素上
+
+react.renderToStaticMackup
+与react.renderToString相同，除了不会包含React的data属性外
+
+componentDidMount和componentWillUnmount不会再服务端渲染过程中被调用，而componentWillMount会被调用
+
+
+
+
+
+
+
+
