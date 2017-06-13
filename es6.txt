@@ -385,3 +385,74 @@ ES5的charAt返回字符串给定位置的字符，但不能识别大于0xFFFF�
 ES7提供at()可以识别
 '𠮷'.at(0) //𠮷
 
+normalize将字符的不同表示方法统一为同样的形式，称为Unicode正规化
+'\u01D1'.normalize()==='\u004F\u030C'.normalize()
+normalize方法接收4个参数
+1：NFC，默认参数，表示“标准等价（视觉和语义上的等价）合成”，返回多个简单字符的合成字符
+2：NFD，表示“标准等价分解”，即在标准等价的前提下返回合成字符分解出的多个简单字符
+3：NFKC，表示“兼容等价合成”，返回合成字符，“兼容等价”指的是语义上等价，视觉上不等价
+4：NFKD，表示“兼容等价分解”，在兼容等价的前提下，返回合成字符分解出的多个简单字符
+normalize不能识别3个或3个以上的字符合成，只能用正则通过unicode编号区间判断
+
+
+includes:返回布尔值，表示是否找到了参数字符串
+startsWith:返回布尔值，表示参数字符串是否在源字符串的头部
+endsWith:返回布尔值，表示参数字符串是否在源字符串的尾部
+var s='abcde fghi';
+s.startsWith('abcd');//true
+s.includes('e');//true
+
+第二个参数表示开始搜索的位置
+var s='abcde fghi';
+s.startsWith(' fghi',5);//true
+s.includes('abcde',0);//true
+
+
+repeat方法返回一个新字符串表示原字符串重复n次
+'s'.repeat(2);//ss
+
+
+字符串头部补全padStart
+'x'.padStart(5,'ab');//'ababx'
+
+字符串尾部补全padEnd
+'x'.padEnd(5,'ab');//'xabab'
+
+
+模板字符串
+var w='world';`hello ${w}`;//"hello world"
+${}大括号里面可以进行运算、引用对象属性、调用函数等
+
+
+?String.raw? 用来充当模板字符串的处理函数，返回一个反斜线都被转义的字符串，对应于替换变量后的模板字符串
+String.raw`Hi\n${2+3}`; //"Hi\n5"	
+String.raw`Hi\u000A`; //"Hi\u000A"
+String.raw`Hi\\n`; //"Hi\\n"
+String.raw({raw:'test'},0,1,2);//"t0e1s2t"
+
+?String.raw=function(strings,...values){
+	var output="";
+	for(var index=0;index<values.length;index++){
+		output+=strings.raw[index]+values[index];
+	}
+	output+=strings.raw[index];
+	return output;
+}?
+
+
+
+
+
+
+
+
+第五章
+正则的扩展
+ES5的RegExp函数只能接受字符串作为参数，var reg=new RegExp("xyz","i");等价于var reg=/xyz/i;
+ES6允许RegExp构造函数接受正则表达式作为参数，会返回一个原有正则表达式的拷贝
+var reg=new RegExp(/xyz/i); 如果使用RegExp构造函数的第2个参数指定修饰符，则返回的正则表达式会忽略原有的正则表达
+
+式的修饰符，只使用新指定的修饰符。 new RegExp(/abc/ig,'i').flags//"i"
+
+ES6将match,replace,search,split定义在RegExp对象上
+
