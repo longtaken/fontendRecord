@@ -975,3 +975,10 @@ entries()、keys()、values()、find()和findIndex()会将空位处理成undefin
 // findIndex()
 [,'a'].findIndex(x => true) // 0
 由于空位的处理规则非常不统一，所以建议避免出现空位。
+
+
+数组推导提供了简洁的写法，允许直接通过现有数组生成新数组
+var a1=[1,2,3];
+var a2=[for(i of a1) i*2];  // [2,4,6]
+数组a2通过for...of结构直接在a1的基础上生成。
+数组推导中，for...of结构总是写在最前面，返回的表达式写在最后面
