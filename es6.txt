@@ -1034,13 +1034,143 @@ f(1, undefined, 2) // [1, 5, 2]
 (function (a = 0, b, c) {}).length // 0
 (function (a, b = 1, c) {}).length // 1
 
-一旦设置了参数的默认值，函数进行声明初始化时，参数会形成一个单独的作用域（context）。等到初始化结束，这个作用域就会消失。这种语法行为，在不设置参数默认值时，是不会出现的。
+
+
+如果参数默认值是一个变量，则变量所处的作用域与其他变量的作用域规则是一样的，即先是当前作用域，然后才是全局作用域
 var x = 1;
 function f(x, y = x) { console.log(y); }
 f(2) // 2
-上面代码中，参数y的默认值等于变量x。调用函数f时，参数形成一个单独的作用域。在这个作用域里面，默认值变量x指向第一个参数x，而不是全局变量x，所以输出是2。
+上面代码中，参数y的默认值等于变量x。调用函数f时，参数形成一个单独的作用域。在这个作用域里面，默认值变量x指向第一
+
+个参数x，而不是全局变量x，所以输出是2。
 
 let x = 1;
 function f(y = x) { let x = 2; console.log(y); }
 f() // 1
-函数f调用时，参数y = x形成一个单独的作用域。这个作用域里面，变量x本身没有定义，所以指向外层的全局变量x。函数调用时，函数体内部的局部变量x影响不到默认值变量x。
+函数调用时y的默认值x未在函数内部生成，所以x指向全局变量，如果不存在全局变量x就会报错
+
+如果函数a的参数默认值是函数b，那么由于函数作用域是其声明时所在所用域，函数b的作用域就不是a，而是全局
+let foo='global';
+
+function bar(func=()=>foo){let foo='local';
+console.log(func());
+}
+
+bar();
+
+利用参数默认值，可以指定某一个参数不得省略
+function throwIfMissing(){ throw new Error('missing pparameter'); }
+function foo(mustBeProvided = throwIfMissing()){ return mustBeProvided; }
+foo();
+参数默认值不是在定义时执行，而是运行时执行。如果将参数定为undefined，表明这个参数可以省略
+
+
+
+rest参数用于获取函数的多余参数，这样就不需要使用arguments对象
+function add(...values){ let sum=0; for(var val of values){ sum+=val; } return sum;}
+add(2,5,3);
+
+argument变量的写法
+const sortNumbers = () => Array.prototype.slice.call(arguments).sort();
+
+rest参数写法
+const sortNumbers = (...numbers) => numbers.sort();
+
+rest参数改写数组push
+function push(array,...items){
+	items.forEach(function(item){
+		array.push(item);
+	});
+}
+var a=[];
+push(a,1,2,3);
+
+函数参数的length属性不包括rest参数
+
+
+
+扩展运算符 是三个点(...)，将一个数组转为用逗号分隔的参数序列(逗号？)
+console.log(...[1,2,3]) //1 2 3
+console.log(1,...[2,3,4],5) //1 2 3 4 5
+
+该运算符主要用于函数调用
+function push(array,...items){ array.push(...items); }
+function add(x,y){ return x+y }
+var numbers = [4,38];
+add(...numbers);//42
+
+展开数组
+//ES5
+function f(x,y,z){}
+var args = [0,1,2];
+f.apply(null,args);
+
+//ES6
+function f(x,y,z){}
+var args = [0,1,2];
+f(...args);
+
+//ES5
+Math.max.apply(null,[14,3,4]);
+
+//ES6
+Math.max(..[14,3,4]);  ==  Math.max(14,3,4);
+
+//ES5
+var arr1=[0,1,2];
+var arr2=[3,4,5];
+Array.prototype.push.apply(arr1,arr2);
+
+//ES6
+var arr1=[0,1,2];
+var arr2=[3,4,5];
+arr1.push(...arr2);
+
+
+合并数组
+ES5  [1,2].concat(more)
+ES6  [1,2,...more]
+
+
+扩展运算符可以与解构赋值结合起来用于生成数组
+//ES5
+a=list[0],rest=list.slice(1)
+
+//ES6
+[a,...rest]=list
+
+
+如果扩展运算符用于数组赋值，只能放在参数的最后一位，否则会报错
+const [...butLast,last]=[1,2,3]//报错
+const [first,...butLast,last]=[1,2,3]//报错
+
+
+将字符串转为真正的数组
+[...'ni'] //['n','i']
+能够正确识别32位的unicode字符
+'x\uD83D\uDE80y'.length//4
+[...'x\uD83D\uDE80y'].length//3
+
+正确返回字符串长度的函数 function length(str){ return [...str].length; }
+
+
+任何类似数组的对象都可以用扩展运算符转为真正的数组
+var nodeList = document.querySelectorAll('div');
+var array=[...nodeList];
+
+扩展运算符内部调用的是数据结构的iterator接口，因此只要具有iterator接口的对象，都可以使用扩展运算符
+map
+let map=new Map([
+	[1,'one'],
+	[2,'two']
+]);
+let arr=[...map.keys()];//][1,2]
+
+generator函数
+var go=function*(){
+	yield 1;
+	yield 2;
+};
+[...go()];//[1,2]
+
+如果没有iterator接口的对象使用扩展运算符会报错
