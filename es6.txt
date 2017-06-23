@@ -1569,3 +1569,816 @@ obj[key2].name // ""
 上面代码中，key1对应的 Symbol 值有描述，key2没有。
 
 
+
+
+Object.is()
+ES5比较两个值是否相等，只有两个运算符：相等运算符（==）和严格相等运算符（===）。它们都有缺点，前者会自动转换数据类型，后者的NaN不等于自身，以及+0等于-0。JavaScript缺乏一种运算，在所有环境中，只要两个值是一样的，它们就应该相等。
+
+ES6提出“Same-value equality”（同值相等）算法，用来解决这个问题。Object.is就是部署这个算法的新方法。它用来比较两个值是否严格相等，与严格比较运算符（===）的行为基本一致。
+
+Object.is('foo', 'foo')// true
+Object.is({}, {})// false
+
+不同之处只有两个：一是+0不等于-0，二是NaN等于自身。
++0 === -0 //true
+NaN === NaN // false
+
+Object.is(+0, -0) // false
+Object.is(NaN, NaN) // true
+
+
+
+Object.is() 
+Object.assign方法用于对象的合并，将源对象（source）的所有可枚举属性，复制到目标对象（target）。
+
+Object.assign方法的第一个参数是目标对象，后面的参数都是源对象。
+
+注意，如果目标对象与源对象有同名属性，或多个源对象有同名属性，则后面的属性会覆盖前面的属性。
+
+如果只有一个参数，Object.assign会直接返回该参数。
+var obj = {a: 1};
+Object.assign(obj) === obj // true
+
+如果该参数不是对象，则会先转成对象，然后返回。
+typeof Object.assign(2) // "object"
+
+由于undefined和null无法转成对象，所以如果它们作为参数，就会报错。
+Object.assign(undefined) // 报错
+Object.assign(null) // 报错
+
+如果undefined和null不在首参数，就不会报错。
+let obj = {a: 1};
+Object.assign(obj, undefined) === obj // true
+Object.assign(obj, null) === obj // true
+
+
+其他类型的值（即数值、字符串和布尔值）不在首参数，也不会报错。但是，除了字符串会以数组形式，拷贝入目标对象，其他值都不会产生效果。
+var v1 = 'abc';
+var v2 = true;
+var v3 = 10;
+var obj = Object.assign({}, v1, v2, v3);
+console.log(obj); // { "0": "a", "1": "b", "2": "c" }
+
+Object.assign拷贝的属性是有限制的，只拷贝源对象的自身属性（不拷贝继承属性），也不拷贝不可枚举的属性（enumerable: false）。
+Object.assign({b: 'c'},
+  Object.defineProperty({}, 'invisible', {
+    enumerable: false,
+    value: 'hello'
+  })
+)
+// { b: 'c' }
+上面代码中，Object.assign要拷贝的对象只有一个不可枚举属性invisible，这个属性并没有被拷贝进去。
+
+属性名为Symbol值的属性，也会被Object.assign拷贝。
+Object.assign({ a: 'b' }, { [Symbol('c')]: 'd' })
+// { a: 'b', Symbol(c): 'd' }
+
+
+Object.assign方法实行的是浅拷贝，而不是深拷贝。也就是说，如果源对象某个属性的值是对象，那么目标对象拷贝得到的是这个对象的引用。
+var obj1 = {a: {b: 1}};
+var obj2 = Object.assign({}, obj1);
+obj1.a.b = 2;
+obj2.a.b // 2
+
+对于这种嵌套的对象，一旦遇到同名属性，Object.assign的处理方法是替换，而不是添加。
+var target = { a: { b: 'c', d: 'e' } }
+var source = { a: { b: 'hello' } }
+Object.assign(target, source)
+// { a: { b: 'hello' } }
+上面代码中，target对象的a属性被source对象的a属性整个替换掉了，而不会得到{ a: { b: 'hello', d: 'e' } }的结果。这通常不是开发者想要的，需要特别小心。
+
+有一些函数库提供Object.assign的定制版本（比如Lodash的_.defaultsDeep方法），可以解决浅拷贝的问题，得到深拷贝的合并
+
+注意，Object.assign可以用来处理数组，但是会把数组视为对象。
+Object.assign([1, 2, 3], [4, 5])
+// [4, 5, 3]
+上面代码中，Object.assign把数组视为属性名为0、1、2的对象，因此源数组的0号属性4覆盖了目标数组的0号属性1。
+
+
+为对象添加属性
+class Point {
+  constructor(x, y) {
+    Object.assign(this, {x, y});
+  }
+}
+上面方法通过Object.assign方法，将x属性和y属性添加到Point类的对象实例。
+
+为对象添加方法
+Object.assign(SomeClass.prototype, {
+  someMethod(arg1, arg2) {  },
+  anotherMethod() {  }
+});
+// 等同于下面的写法
+SomeClass.prototype.someMethod = function (arg1, arg2) {};
+SomeClass.prototype.anotherMethod = function () {};
+上面代码使用了对象属性的简洁表示法，直接将两个函数放在大括号中，再使用assign方法添加到SomeClass.prototype之中
+
+
+克隆对象
+function clone(origin) { return Object.assign({}, origin); }
+上面代码将原始对象拷贝到一个空对象，就得到了原始对象的克隆。
+不过，采用这种方法克隆，只能克隆原始对象自身的值，不能克隆它继承的值。如果想要保持继承链，可以采用下面的代码。
+function clone(origin) {
+  let originProto = Object.getPrototypeOf(origin);
+  return Object.assign(Object.create(originProto), origin);
+}
+
+合并多个对象
+将多个对象合并到某个对象。
+const merge =(target, ...sources) => Object.assign(target, ...sources);
+如果希望合并后返回一个新对象，可以改写上面函数，对一个空对象合并。
+const merge =(...sources) => Object.assign({}, ...sources);
+
+为属性指定默认值
+const DEFAULTS = { logLevel: 0, outputFormat: 'html' };
+function processContent(options) {
+  options = Object.assign({}, DEFAULTS, options);
+  console.log(options);
+}
+上面代码中，DEFAULTS对象是默认值，options对象是用户提供的参数。Object.assign方法将DEFAULTS和options合并成一个新对象，如果两者有同名属性，则option的属性值会覆盖DEFAULTS的属性值。
+
+
+由于存在浅拷贝的问题，DEFAULTS对象和options对象的所有属性的值，最好都是简单类型，不要指向另一个对象。否则，DEFAULTS对象的该属性很可能不起作用。
+const DEFAULTS = {
+  url: {
+    host: 'example.com',
+    port: 7070
+  },
+};
+processContent({ url: {port: 8000} })
+// {
+//   url: {port: 8000}
+// }
+上面代码的原意是将url.port改成8000，url.host不变。实际结果却是options.url覆盖掉DEFAULTS.url，所以url.host就不存在了。
+
+
+属性的可枚举性
+对象的每个属性都有一个描述对象（Descriptor），用来控制该属性的行为。Object.getOwnPropertyDescriptor方法可以获取该属性的描述对象。
+let obj = { foo: 123 };
+Object.getOwnPropertyDescriptor(obj, 'foo')
+//  {
+//    value: 123,
+//    writable: true,
+//    enumerable: true,
+//    configurable: true
+//  }
+描述对象的enumerable属性，称为”可枚举性“，如果该属性为false，就表示某些操作会忽略当前属性。
+
+ES5有三个操作会忽略enumerable为false的属性。
+for...in循环：只遍历对象自身的和继承的可枚举的属性
+Object.keys()：返回对象自身的所有可枚举的属性的键名
+JSON.stringify()：只串行化对象自身的可枚举的属性
+ES6新增了一个操作Object.assign()，会忽略enumerable为false的属性，只拷贝对象自身的可枚举的属性。
+
+这四个操作之中，只有for...in会返回继承的属性。实际上，引入enumerable的最初目的，就是让某些属性可以规避掉for...in操作。比如，对象原型的toString方法，以及数组的length属性，就通过这种手段，不会被for...in遍历到。
+Object.getOwnPropertyDescriptor(Object.prototype, 'toString').enumerable
+// false
+Object.getOwnPropertyDescriptor([], 'length').enumerable
+// false
+上面代码中，toString和length属性的enumerable都是false，因此for...in不会遍历到这两个继承自原型的属性。
+另外，ES6规定，所有Class的原型的方法都是不可枚举的。
+Object.getOwnPropertyDescriptor(class {foo() {}}.prototype, 'foo').enumerable
+// false
+总的来说，操作中引入继承的属性会让问题复杂化，大多数时候，我们只关心对象自身的属性。所以，尽量不要用for...in循环，而用Object.keys()代替。
+
+
+属性的遍历
+ES6 一共有6种方法可以遍历对象的属性。
+（1）for...in
+for...in循环遍历对象自身的和继承的可枚举属性（不含 Symbol 属性）。
+
+（2）Object.keys(obj)
+Object.keys返回一个数组，包括对象自身的（不含继承的）所有可枚举属性（不含 Symbol 属性）。
+
+（3）Object.getOwnPropertyNames(obj)
+Object.getOwnPropertyNames返回一个数组，包含对象自身的所有属性（不含 Symbol 属性，但是包括不可枚举属性）。
+
+（4）Object.getOwnPropertySymbols(obj)
+Object.getOwnPropertySymbols返回一个数组，包含对象自身的所有 Symbol 属性。
+
+（5）Reflect.ownKeys(obj)
+Reflect.ownKeys返回一个数组，包含对象自身的所有属性，不管属性名是 Symbol 或字符串，也不管是否可枚举。
+
+（6）Reflect.enumerate(obj)
+Reflect.enumerate返回一个iterator对象，遍历对象自身的和继承的所有可枚举属性（不含symbol属性），与for in循环相同
+
+
+以上的5种方法遍历对象的属性，都遵守同样的属性遍历的次序规则。
+首先遍历所有属性名为数值的属性，按照数字排序。
+其次遍历所有属性名为字符串的属性，按照生成时间排序。
+最后遍历所有属性名为 Symbol 值的属性，按照生成时间排序。
+Reflect.ownKeys({ [Symbol()]:0, b:0, 10:0, 2:0, a:0 })
+// ['2', '10', 'b', 'a', Symbol()]
+
+
+
+__proto__属性
+__proto__属性（前后各两个下划线），用来读取或设置当前对象的prototype对象。目前，所有浏览器（包括 IE11）都部署了这个属性。
+// es6的写法
+var obj = {
+  method: function() { ... }
+};
+obj.__proto__ = someOtherObj;
+
+// es5的写法
+var obj = Object.create(someOtherObj);
+obj.method = function() { ... };
+上面代码中，Reflect.ownKeys方法返回一个数组，包含了参数对象的所有属性。这个数组的属性次序是这样的，首先是数值属性2和10，其次是字符串属性b和a，最后是 Symbol 属性。
+
+该属性没有写入 ES6 的正文，而是写入了附录，原因是__proto__前后的双下划线，说明它本质上是一个内部属性，而不是一个正式的对外的 API，只是由于浏览器广泛支持，才被加入了 ES6。标准明确规定，只有浏览器必须部署这个属性，其他运行环境不一定需要部署，而且新的代码最好认为这个属性是不存在的。
+因此，无论从语义的角度，还是从兼容性的角度，都不要使用这个属性，而是使用下面的Object.setPrototypeOf()（写操作）、Object.getPrototypeOf()（读操作）、Object.create()（生成操作）代替。
+
+在实现上，__proto__调用的是Object.prototype.__proto__
+
+如果一个对象本身部署了__proto__属性，则该属性的值就是对象的原型。
+Object.getPrototypeOf({ __proto__: null })
+// null
+
+
+Object.setPrototypeOf方法的作用与__proto__相同，用来设置一个对象的prototype对象，返回参数对象本身。它是 ES6 正式推荐的设置原型对象的方法。
+// 格式
+Object.setPrototypeOf(object, prototype)
+
+// 用法
+var o = Object.setPrototypeOf({}, null);
+该方法等同于下面的函数
+function (obj, proto) {
+  obj.__proto__ = proto;
+  return obj;
+}
+
+下面是一个例子。
+let proto = {};
+let obj = { x: 10 };
+Object.setPrototypeOf(obj, proto);
+proto.y = 20;
+proto.z = 40;
+obj.x // 10
+obj.y // 20
+obj.z // 40
+上面代码将proto对象设为obj对象的原型，所以从obj对象可以读取proto对象的属性。
+
+如果第一个参数不是对象，会自动转为对象。但是由于返回的还是第一个参数，所以这个操作不会产生任何效果。
+Object.setPrototypeOf(1, {}) === 1 // true
+Object.setPrototypeOf('foo', {}) === 'foo' // true
+Object.setPrototypeOf(true, {}) === true // true
+
+由于undefined和null无法转为对象，所以如果第一个参数是undefined或null，就会报错。
+Object.setPrototypeOf(undefined, {})
+// TypeError: Object.setPrototypeOf called on null or undefined
+Object.setPrototypeOf(null, {})
+// TypeError: Object.setPrototypeOf called on null or undefined
+
+
+Object.getPrototypeOf()
+该方法与Object.setPrototypeOf方法配套，用于读取一个对象的原型对象。
+
+如果参数不是对象，会被自动转为对象。
+// 等同于 Object.getPrototypeOf(Number(1))
+Object.getPrototypeOf(1)
+// Number {[[PrimitiveValue]]: 0}
+
+// 等同于 Object.getPrototypeOf(String('foo'))
+Object.getPrototypeOf('foo')
+// String {length: 0, [[PrimitiveValue]]: ""}
+
+// 等同于 Object.getPrototypeOf(Boolean(true))
+Object.getPrototypeOf(true)
+// Boolean {[[PrimitiveValue]]: false}
+
+Object.getPrototypeOf(1) === Number.prototype // true
+Object.getPrototypeOf('foo') === String.prototype // true
+Object.getPrototypeOf(true) === Boolean.prototype // true
+
+如果参数是undefined或null，它们无法转为对象，所以会报错。
+Object.getPrototypeOf(null)
+// TypeError: Cannot convert undefined or null to object
+Object.getPrototypeOf(undefined)
+// TypeError: Cannot convert undefined or null to object
+
+
+对象的扩展运算符
+Rest参数
+Rest参数用于从一个对象取值，相当于将所有可遍历但尚未被读取的属性，分配到指定的对象上。所有的键及其值都会复制到新对象上。
+let {x,y,...z}={x:1,y:2,a:3,b:4};
+x//1  y//2  z//{a:3,b:4}
+
+rest参数的复制是浅复制，如果一个值是复合类型的值，rest参数复制的是这个值的引用，而不是这个值的副本
+
+扩展运算符
+扩展运算符用于取出参数对象的所有可遍历属性，复制到当前对象中
+let z = { a: 3, b: 4 };
+let n = { ...z };
+n // { a: 3, b: 4 }
+这等同于使用Object.assign方法。
+
+let aClone = { ...a };
+// 等同于
+let aClone = Object.assign({}, a);
+
+扩展运算符可以用于合并两个对象。
+let ab = { ...a, ...b };
+// 等同于
+let ab = Object.assign({}, a, b);
+
+如果用户自定义的属性，放在扩展运算符后面，则扩展运算符内部的同名属性会被覆盖掉。
+let aWithOverrides = { ...a, x: 1, y: 2 };
+// 等同于
+let aWithOverrides = { ...a, ...{ x: 1, y: 2 } };
+// 等同于
+let x = 1, y = 2, aWithOverrides = { ...a, x, y };
+// 等同于
+let aWithOverrides = Object.assign({}, a, { x: 1, y: 2 });
+上面代码中，a对象的x属性和y属性，拷贝到新对象后会被覆盖掉。
+
+这用来修改现有对象部分的部分属性就很方便了。
+let newVersion = {
+  ...previousVersion,
+  name: 'New Name' // Override the name property
+};
+上面代码中，newVersion对象自定义了name属性，其他属性全部复制自previousVersion对象。
+
+如果把自定义属性放在扩展运算符前面，就变成了设置新对象的默认属性值。
+let aWithDefaults = { x: 1, y: 2, ...a };
+// 等同于
+let aWithDefaults = Object.assign({}, { x: 1, y: 2 }, a);
+// 等同于
+let aWithDefaults = Object.assign({ x: 1, y: 2 }, a);
+
+扩展运算符的参数对象之中，如果有取值函数get，这个函数是会执行的。
+// 并不会抛出错误，因为x属性只是被定义，但没执行
+let aWithXGetter = {
+  ...a,
+  get x() {
+    throws new Error('not thrown yet');
+  }
+};
+
+// 会抛出错误，因为x属性被执行了
+let runtimeError = {
+  ...a,
+  ...{
+    get x() {
+      throws new Error('thrown now');
+    }
+  }
+};
+如果扩展运算符的参数是null或undefined，这两个值会被忽略，不会报错。
+
+let emptyObject = { ...null, ...undefined }; // 不报错
+
+
+
+
+
+
+
+
+
+
+
+第十章
+Symbol
+
+ES5 的对象属性名都是字符串，这容易造成属性名的冲突
+
+ES6 引入了一种新的原始数据类型Symbol，表示独一无二的值。它是 JavaScript 语言的第七种数据类型，前六种是：undefined、null、布尔值（Boolean）、字符串（String）、数值（Number）、对象（Object）。
+
+Symbol 值通过Symbol函数生成。这就是说，对象的属性名现在可以有两种类型，一种是原来就有的字符串，另一种就是新增的 Symbol 类型。凡是属性名属于 Symbol 类型，就都是独一无二的，可以保证不会与其他属性名产生冲突。
+
+let s = Symbol();
+typeof s  // "symbol"
+上面代码中，变量s就是一个独一无二的值。typeof运算符的结果，表明变量s是 Symbol 数据类型，而不是字符串之类的其他类型。
+
+注意，Symbol函数前不能使用new命令，否则会报错。这是因为生成的 Symbol 是一个原始类型的值，不是对象。也就是说，由于 Symbol 值不是对象，所以不能添加属性。基本上，它是一种类似于字符串的数据类型。
+
+Symbol函数可以接受一个字符串作为参数，表示对 Symbol 实例的描述，主要是为了在控制台显示，或者转为字符串时，比较容易区分。
+var s1 = Symbol('foo');
+var s2 = Symbol('bar');
+s1 // Symbol(foo)
+s2 // Symbol(bar)
+s1.toString() // "Symbol(foo)"
+s2.toString() // "Symbol(bar)"
+上面代码中，s1和s2是两个 Symbol 值。如果不加参数，它们在控制台的输出都是Symbol()，不利于区分。有了参数以后，就等于为它们加上了描述，输出的时候就能够分清，到底是哪一个值。
+
+如果 Symbol 的参数是一个对象，就会调用该对象的toString方法，将其转为字符串，然后才生成一个 Symbol 值。
+const obj = {
+  toString() {
+    return 'abc';
+  }
+};
+const sym = Symbol(obj);
+sym // Symbol(abc)
+注意，Symbol函数的参数只是表示对当前 Symbol 值的描述，因此相同参数的Symbol函数的返回值是不相等的。
+
+// 没有参数的情况
+var s1 = Symbol();
+var s2 = Symbol();
+s1 === s2 // false
+
+// 有参数的情况
+var s1 = Symbol('foo');
+var s2 = Symbol('foo');
+s1 === s2 // false
+上面代码中，s1和s2都是Symbol函数的返回值，而且参数相同，但是它们是不相等的。
+
+Symbol 值不能与其他类型的值进行运算，会报错。
+var sym = Symbol('My symbol');
+"your symbol is " + sym
+// TypeError: can't convert symbol to string
+`your symbol is ${sym}`
+// TypeError: can't convert symbol to string
+
+但是，Symbol 值可以显式转为字符串。
+var sym = Symbol('My symbol');
+String(sym) // 'Symbol(My symbol)'
+sym.toString() // 'Symbol(My symbol)'
+
+另外，Symbol 值也可以转为布尔值，但是不能转为数值。
+var sym = Symbol();
+Boolean(sym) // true
+!sym  // false
+if (sym) {
+  // ...
+}
+Number(sym) // TypeError
+sym + 2 // TypeError
+
+
+由于每一个 Symbol 值都是不相等的，这意味着 Symbol 值可以作为标识符，用于对象的属性名，就能保证不会出现同名的属性。这对于一个对象由多个模块构成的情况非常有用，能防止某一个键被不小心改写或覆盖。
+
+var mySymbol = Symbol();
+// 第一种写法
+var a = {};
+a[mySymbol] = 'Hello!';
+
+// 第二种写法
+var a = {
+  [mySymbol]: 'Hello!'
+};
+
+// 第三种写法
+var a = {};
+Object.defineProperty(a, mySymbol, { value: 'Hello!' });
+
+// 以上写法都得到同样结果
+a[mySymbol] // "Hello!"
+
+上面代码通过方括号结构和Object.defineProperty，将对象的属性名指定为一个 Symbol 值。
+
+
+注意，Symbol 值作为对象属性名时，不能用点运算符。
+var mySymbol = Symbol();
+var a = {};
+a.mySymbol = 'Hello!';
+a[mySymbol] // undefined
+a['mySymbol'] // "Hello!"
+上面代码中，因为点运算符后面总是字符串，所以不会读取mySymbol作为标识名所指代的那个值，导致a的属性名实际上是一个字符串，而不是一个 Symbol 值。
+
+同理，在对象的内部，使用 Symbol 值定义属性时，Symbol 值必须放在方括号之中。
+let s = Symbol();
+let obj = {
+  [s]: function (arg) { ... }
+};
+obj[s](123);
+上面代码中，如果s不放在方括号中，该属性的键名就是字符串s，而不是s所代表的那个 Symbol 值。
+
+采用增强的对象写法，上面代码的obj对象可以写得更简洁一些。
+let obj = {
+  [s](arg) { ... }
+};
+
+Symbol 类型还可以用于定义一组常量，保证这组常量的值都是不相等的。
+log.levels = {
+  DEBUG: Symbol('debug'),
+  INFO: Symbol('info'),
+  WARN: Symbol('warn')
+};
+log(log.levels.DEBUG, 'debug message');
+log(log.levels.INFO, 'info message');
+
+下面是另外一个例子。
+const COLOR_RED    = Symbol();
+const COLOR_GREEN  = Symbol();
+function getComplement(color) {
+  switch (color) {
+    case COLOR_RED:
+      return COLOR_GREEN;
+    case COLOR_GREEN:
+      return COLOR_RED;
+    default:
+      throw new Error('Undefined color');
+    }
+}
+常量使用 Symbol 值最大的好处，就是其他任何值都不可能有相同的值了，因此可以保证上面的switch语句会按设计的方式工作。
+
+还有一点需要注意，Symbol 值作为属性名时，该属性还是公开属性，不是私有属性。
+
+
+魔术字符串指的是，在代码之中多次出现、与代码形成强耦合的某一个具体的字符串或者数值。风格良好的代码，应该尽量消除魔术字符串，改由含义清晰的变量代替。
+function getArea(shape, options) {
+  var area = 0;
+  switch (shape) {
+    case 'Triangle': // 魔术字符串
+      area = .5 * options.width * options.height;
+      break;
+    /* ... more code ... */
+  }
+  return area;
+}
+getArea('Triangle', { width: 100, height: 100 }); // 魔术字符串
+上面代码中，字符串Triangle就是一个魔术字符串。它多次出现，与代码形成“强耦合”，不利于将来的修改和维护。
+
+常用的消除魔术字符串的方法，就是把它写成一个变量。
+var shapeType = {
+  triangle: 'Triangle'
+};
+function getArea(shape, options) {
+  var area = 0;
+  switch (shape) {
+    case shapeType.triangle:
+      area = .5 * options.width * options.height;
+      break;
+  }
+  return area;
+}
+getArea(shapeType.triangle, { width: 100, height: 100 });
+上面代码中，我们把Triangle写成shapeType对象的triangle属性，这样就消除了强耦合。
+
+如果仔细分析，可以发现shapeType.triangle等于哪个值并不重要，只要确保不会跟其他shapeType属性的值冲突即可。因此，这里就很适合改用 Symbol 值。
+const shapeType = {
+  triangle: Symbol()
+};
+上面代码中，除了将shapeType.triangle的值设为一个Symbol，其他地方都不用修改。
+
+
+Symbol 作为属性名，该属性不会出现在for...in、for...of循环中，也不会被Object.keys()、Object.getOwnPropertyNames()、JSON.stringify()返回。但是，它也不是私有属性，有一个Object.getOwnPropertySymbols方法，可以获取指定对象的所有 Symbol 属性名。
+
+Object.getOwnPropertySymbols方法返回一个数组，成员是当前对象的所有用作属性名的 Symbol 值。
+var obj = {};
+var a = Symbol('a');
+var b = Symbol('b');
+obj[a] = 'Hello';
+obj[b] = 'World';
+var objectSymbols = Object.getOwnPropertySymbols(obj);
+objectSymbols
+// [Symbol(a), Symbol(b)]
+
+下面是另一个例子，Object.getOwnPropertySymbols方法与for...in循环、Object.getOwnPropertyNames方法进行对比的例子。
+var obj = {};
+var foo = Symbol("foo");
+Object.defineProperty(obj, foo, {
+  value: "foobar",
+});
+for (var i in obj) {
+  console.log(i); // 无输出
+}
+Object.getOwnPropertyNames(obj)
+// []
+Object.getOwnPropertySymbols(obj)
+// [Symbol(foo)]
+上面代码中，使用Object.getOwnPropertyNames方法得不到Symbol属性名，需要使用Object.getOwnPropertySymbols方法。
+
+另一个新的API，Reflect.ownKeys方法可以返回所有类型的键名，包括常规键名和 Symbol 键名。
+let obj = {
+  [Symbol('my_key')]: 1,
+  enum: 2,
+  nonEnum: 3
+};
+Reflect.ownKeys(obj)
+//  ["enum", "nonEnum", Symbol(my_key)]
+
+由于以 Symbol 值作为名称的属性，不会被常规方法遍历得到。我们可以利用这个特性，为对象定义一些非私有的、但又希望只用于内部的方法。
+var size = Symbol('size');
+class Collection {
+  constructor() {
+    this[size] = 0;
+  }
+  add(item) {
+    this[this[size]] = item;
+    this[size]++;
+  }
+  static sizeOf(instance) {
+    return instance[size];
+  }
+}
+var x = new Collection();
+Collection.sizeOf(x) // 0
+x.add('foo');
+Collection.sizeOf(x) // 1
+Object.keys(x) // ['0']
+Object.getOwnPropertyNames(x) // ['0']
+Object.getOwnPropertySymbols(x) // [Symbol(size)]
+上面代码中，对象x的size属性是一个 Symbol 值，所以Object.keys(x)、Object.getOwnPropertyNames(x)都无法获取它。这就造成了一种非私有的内部方法的效果。
+
+
+Symbol.for()，Symbol.keyFor()
+有时，我们希望重新使用同一个Symbol值，Symbol.for方法可以做到这一点。它接受一个字符串作为参数，然后搜索有没有以该参数作为名称的Symbol值。如果有，就返回这个Symbol值，否则就新建并返回一个以该字符串为名称的Symbol值。
+var s1 = Symbol.for('foo');
+var s2 = Symbol.for('foo');
+s1 === s2 // true
+上面代码中，s1和s2都是 Symbol 值，但是它们都是同样参数的Symbol.for方法生成的，所以实际上是同一个值。
+
+Symbol.for()与Symbol()这两种写法，都会生成新的Symbol。它们的区别是，前者会被登记在全局环境中供搜索，后者不会。Symbol.for()不会每次调用就返回一个新的 Symbol 类型的值，而是会先检查给定的key是否已经存在，如果不存在才会新建一个值。比如，如果你调用Symbol.for("cat")30次，每次都会返回同一个 Symbol 值，但是调用Symbol("cat")30次，会返回30个不同的Symbol值。
+Symbol.for("bar") === Symbol.for("bar")
+// true
+
+Symbol("bar") === Symbol("bar")
+// false
+上面代码中，由于Symbol()写法没有登记机制，所以每次调用都会返回一个不同的值。
+
+Symbol.keyFor方法返回一个已登记的 Symbol 类型值的key。
+var s1 = Symbol.for("foo");
+Symbol.keyFor(s1) // "foo"
+var s2 = Symbol("foo");
+Symbol.keyFor(s2) // undefined
+上面代码中，变量s2属于未登记的Symbol值，所以返回undefined。
+
+需要注意的是，Symbol.for为Symbol值登记的名字，是全局环境的，可以在不同的 iframe 或 service worker 中取到同一个值。
+iframe = document.createElement('iframe');
+iframe.src = String(window.location);
+document.body.appendChild(iframe);
+iframe.contentWindow.Symbol.for('foo') === Symbol.for('foo')
+// true
+上面代码中，iframe 窗口生成的 Symbol 值，可以在主页面得到。
+
+
+除了定义自己使用的Symbol值以外，ES6还提供了11个内置的Symbol值，指向语言内部使用的方法。
+
+Symbol.hasInstance
+对象的Symbol.hasInstance属性，指向一个内部方法。当其他对象使用instanceof运算符，判断是否为该对象的实例时，会调用这个方法。比如，foo instanceof Foo在语言内部，实际调用的是Foo[Symbol.hasInstance](foo)。
+class MyClass {
+  [Symbol.hasInstance](foo) {
+    return foo instanceof Array;
+  }
+}
+
+[1, 2, 3] instanceof new MyClass() // true
+上面代码中，MyClass是一个类，new MyClass()会返回一个实例。该实例的Symbol.hasInstance方法，会在进行instanceof运算时自动调用，判断左侧的运算子是否为Array的实例。
+
+
+
+Symbol.species
+对象的Symbol.species属性，指向当前对象的构造函数。创造实例时，默认会调用这个方法，即使用这个属性返回的函数当作构造函数，来创造新的实例对象。
+
+class MyArray extends Array {
+  // 覆盖父类 Array 的构造函数
+  static get [Symbol.species]() { return Array; }
+}
+上面代码中，子类MyArray继承了父类Array。创建MyArray的实例对象时，本来会调用它自己的构造函数（本例中被省略了），但是由于定义了Symbol.species属性，所以会使用这个属性返回的的函数，创建MyArray的实例。
+
+这个例子也说明，定义Symbol.species属性要采用get读取器。默认的Symbol.species属性等同于下面的写法。
+static get [Symbol.species]() {
+  return this;
+}
+
+
+
+Symbol.match
+对象的Symbol.match属性，指向一个函数。当执行str.match(myObject)时，如果该属性存在，会调用它，返回该方法的返回值。
+
+String.prototype.match(regexp)
+// 等同于
+regexp[Symbol.match](this)
+
+class MyMatcher {
+  [Symbol.match](string) {
+    return 'hello world'.indexOf(string);
+  }
+}
+
+'e'.match(new MyMatcher()) // 1
+
+
+
+Symbol.replace
+对象的Symbol.replace属性，指向一个方法，当该对象被String.prototype.replace方法调用时，会返回该方法的返回值。
+
+String.prototype.replace(searchValue, replaceValue)
+// 等同于
+searchValue[Symbol.replace](this, replaceValue)
+
+
+
+Symbol.search
+对象的Symbol.search属性，指向一个方法，当该对象被String.prototype.search方法调用时，会返回该方法的返回值。
+
+String.prototype.search(regexp)
+// 等同于
+regexp[Symbol.search](this)
+
+
+
+Symbol.split
+对象的Symbol.split属性，指向一个方法，当该对象被String.prototype.split方法调用时，会返回该方法的返回值。
+
+String.prototype.split(separator, limit)
+// 等同于
+separator[Symbol.split](this, limit)
+
+
+
+Symbol.iterator
+对象的Symbol.iterator属性，指向该对象的默认遍历器方法。
+var myIterable = {};
+myIterable[Symbol.iterator] = function* () {
+  yield 1;
+  yield 2;
+  yield 3;
+};
+
+[...myIterable] // [1, 2, 3]
+对象进行for...of循环时，会调用Symbol.iterator方法，返回该对象的默认遍历器
+
+
+
+
+Symbol.toPrimitive
+对象的Symbol.toPrimitive属性，指向一个方法。该对象被转为原始类型的值时，会调用这个方法，返回该对象对应的原始类型值。
+
+Symbol.toPrimitive被调用时，会接受一个字符串参数，表示当前运算的模式，一共有三种模式。
+Number：该场合需要转成数值
+String：该场合需要转成字符串
+Default：该场合可以转成数值，也可以转成字符串
+let obj = {
+  [Symbol.toPrimitive](hint) {
+    switch (hint) {
+      case 'number':
+        return 123;
+      case 'string':
+        return 'str';
+      case 'default':
+        return 'default';
+      default:
+        throw new Error();
+     }
+   }
+};
+
+2 * obj // 246
+3 + obj // '3default'
+obj == 'default' // true
+String(obj) // 'str'
+
+
+
+Symbol.toStringTag
+对象的Symbol.toStringTag属性，指向一个方法。在该对象上面调用Object.prototype.toString方法时，如果这个属性存在，它的返回值会出现在toString方法返回的字符串之中，表示对象的类型。也就是说，这个属性可以用来定制[object Object]或[object Array]中object后面的那个字符串。
+// 例一
+({[Symbol.toStringTag]: 'Foo'}.toString())
+// "[object Foo]"
+
+// 例二
+class Collection {
+  get [Symbol.toStringTag]() {
+    return 'xxx';
+  }
+}
+var x = new Collection();
+Object.prototype.toString.call(x) // "[object xxx]"
+
+
+对象的Symbol.unscopables属性，指向一个对象。该对象指定了使用with关键字时，哪些属性会被with环境排除。
+
+
+
+
+
+
+
+
+
+
+
+
+第十一章
+proxy 和 reflect
+
+Proxy 用于修改某些操作的默认行为，等同于在语言层面做出修改，所以属于一种“元编程”（meta programming），即对编程语言进行编程。
+
+Proxy 可以理解成，在目标对象之前架设一层“拦截”，外界对该对象的访问，都必须先通过这层拦截，因此提供了一种机制，可以对外界的访问进行过滤和改写。
+
+Proxy 这个词的原意是代理，用在这里表示由它来“代理”某些操作，可以译为“代理器”。
+
+
+
+var obj = new Proxy({}, {
+  get: function (target, key, receiver) {
+    console.log(`getting ${key}!`);
+    return Reflect.get(target, key, receiver);
+  },
+  set: function (target, key, value, receiver) {
+    console.log(`setting ${key}!`);
+    return Reflect.set(target, key, value, receiver);
+  }
+});
+上面代码对一个空对象架设了一层拦截，重定义了属性的读取（get）和设置（set）行为。这里暂时先不解释具体的语法，只看运行结果。对设置了拦截行为的对象obj，去读写它的属性，就会得到下面的结果。
+obj.count = 1
+//  setting count!
+//1
+++obj.count
+//  getting count!
+//  setting count!
+//  2
+上面代码说明，Proxy 实际上重载（overload）了点运算符，即用自己的定义覆盖了语言的原始定义。
+
