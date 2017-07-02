@@ -35,9 +35,7 @@ babel加载为require命令的一个钩子：
 require("babel-core/register")
 后面所有通过require加载的后缀名为.es6、.es、.jsx、.js的脚本都会通过babel转码再加载。
 
-babel默认不会转换Iterator、Generator、Set、Map、Proxy、Reflect、Symbol、Promise等全局对象，以及一些定义在全局对
-
-象上的方法（如Object.assign）。如需使用就安装
+babel默认不会转换Iterator、Generator、Set、Map、Proxy、Reflect、Symbol、Promise等全局对象，以及一些定义在全局对象上的方法（如Object.assign）。如需使用就安装
 npm i babel-polyfill -S，然后require('babel-polyfill');
 
 
@@ -51,10 +49,7 @@ let const命令
 let
 let在代码块内有效
 不存在变量提升（为声明之前使用typeof也会报错）
-暂时性死区：
-	如果区块存在let/const命令，则这个区块对这些命令声明的变量从一开始就形成封闭作用域，只要在声明之前使用这
-
-些变量，就报错。
+暂时性死区：如果区块存在let/const命令，则这个区块对这些命令声明的变量从一开始就形成封闭作用域，只要在声明之前使用这些变量，就报错。
 var tmp=1;
 if(1){
 	tmp='12';//ReferenceError
@@ -3667,3 +3662,386 @@ WeakSet
 WeakSet 结构与 Set 类似，也是不重复的值的集合。但是，它与 Set 有两个区别。
 WeakSet 的成员只能是对象，而不能是其他类型的值。
 WeakSet 中的对象都是弱引用，即垃圾回收机制不考虑 WeakSet 对该对象的引用，也就是说，如果其他对象都不再引用该对象，那么垃圾回收机制会自动回收该对象所占用的内存，不考虑该对象还存在于 WeakSet 之中。这个特点意味着无法引用WeakSet的成员， WeakSet是不可遍历的
+
+
+
+Map
+Object 结构提供了“字符串—值”的对应，Map结构提供了“值—值”的对应，是一种更完善的 Hash 结构实现
+
+const m = new Map();
+const o = {p: 'Hello World'};
+m.set(o, 'content') 
+m.get(o) // "content"
+m.has(o) // true
+m.delete(o) // true
+m.has(o) // false
+
+如果map的键是复合类型，需要内存地址相同才返回设置的值
+let map=new Map();map.set(['a'],555);map.ge(['a']);//undefined
+
+如果map的键是基础类型的值，则只要两个值严格相等，map就能正确返回设置的值
+let map=new Map();map.set(NaN,123);map.get(NaN);//123
+
+实例的属性和操作方法
+size属性
+let map=new Map();
+map.set('foo',true);
+map.set('bar',false);
+map.size//2
+
+set(key,value)
+set方法设置key所对应的键值，然后返回整个map结构，如果key已经有值，则键值会被更新。
+set方法返回的是Map本身，所以可以使用链式写法
+let map=new Map().set(1,'a').set(2,'b');
+
+get(key)
+get方法读取key对应的键值，如果找不到key，则返回undefined
+
+has(key)
+has方法返回一个布尔值，表示某个键是否在Map数据结构中
+
+delete(key)
+delete方法删除某个键，返回true。如果删除失败，返回false
+
+clear()
+clear方法清除所有成员，没有返回值
+
+
+遍历方法
+Map 结构原生提供三个遍历器生成函数和一个遍历方法。
+
+keys()：返回键名的遍历器。
+values()：返回键值的遍历器。
+entries()：返回所有成员的遍历器。
+forEach()：遍历 Map 的所有成员。
+需要特别注意的是，Map 的遍历顺序就是插入顺序
+
+
+Map 结构转为数组结构，比较快速的方法是使用扩展运算符（...）。
+const map = new Map([
+  [1, 'one'],
+  [2, 'two'],
+  [3, 'three'],
+]);
+[...map.keys()]
+// [1, 2, 3]
+[...map.values()]
+// ['one', 'two', 'three']
+
+
+数组 转为 Map
+将数组传入 Map 构造函数，就可以转为 Map。
+new Map([
+  [true, 7],
+  [{foo: 3}, ['abc']]
+])
+
+
+Map 转为对象
+如果所有 Map 的键都是字符串，它可以转为对象。
+function strMapToObj(strMap) {
+  let obj = Object.create(null);
+  for (let [k,v] of strMap) {
+    obj[k] = v;
+  }
+  return obj;
+}
+const myMap = new Map()
+  .set('yes', true)
+  .set('no', false);
+strMapToObj(myMap)
+// { yes: true, no: false }
+
+
+对象转为 Map
+function objToStrMap(obj) {
+  let strMap = new Map();
+  for (let k of Object.keys(obj)) {
+    strMap.set(k, obj[k]);
+  }
+  return strMap;
+}
+objToStrMap({yes: true, no: false})
+// Map {"yes" => true, "no" => false}
+
+
+Map 转为 JSON
+Map 转为 JSON 要区分两种情况。一种情况是，Map 的键名都是字符串，这时可以选择转为对象 JSON。
+function strMapToJson(strMap) {
+  return JSON.stringify(strMapToObj(strMap));
+}
+let myMap = new Map().set('yes', true).set('no', false);
+strMapToJson(myMap)
+// '{"yes":true,"no":false}'
+另一种情况是，Map 的键名有非字符串，这时可以选择转为数组 JSON。
+function mapToArrayJson(map) {
+  return JSON.stringify([...map]);
+}
+let myMap = new Map().set(true, 7).set({foo: 3}, ['abc']);
+mapToArrayJson(myMap)
+// '[[true,7],[{"foo":3},["abc"]]]'
+
+
+JSON 转为 Map
+JSON 转为 Map，正常情况下，所有键名都是字符串。
+function jsonToStrMap(jsonStr) {
+  return objToStrMap(JSON.parse(jsonStr));
+}
+jsonToStrMap('{"yes": true, "no": false}')
+// Map {'yes' => true, 'no' => false}
+但是，有一种特殊情况，整个 JSON 就是一个数组，且每个数组成员本身，又是一个有两个成员的数组。这时，它可以一一对应地转为Map。这往往是数组转为 JSON 的逆操作。
+function jsonToMap(jsonStr) {
+  return new Map(JSON.parse(jsonStr));
+}
+jsonToMap('[[true,7],[{"foo":3},["abc"]]]')
+// Map {true => 7, Object {foo: 3} => ['abc']}
+
+
+WeakMap与Map的区别有两点。
+首先，WeakMap只接受对象作为键名（null除外），不接受其他类型的值作为键名。
+其次，WeakMap的键名所指向的对象，不计入垃圾回收机制。
+WeakMap的设计目的在于，键名是对象的弱引用（垃圾回收机制不将该引用考虑在内），所以其所对应的对象可能会被自动回收。
+当对象被回收后，WeakMap自动移除对应的键值对。
+典型应用是一个对应DOM元素的WeakMap解构，当某个DOM元素被清除，其所对应的WeakMap记录就会自动移除
+基本上，WeakMap的专用场合就是，它的键所对应的对象可能会在将来消失
+
+WeakMap与Map在API上的区别有两个，一是没有遍历操作，没有size属性。二是无法清空，不支持clear方法
+
+
+
+
+
+
+
+
+第十四章
+Iterator和for...of循环
+遍历器（Iterator）就是这样一种机制。它是一种接口，为各种不同的数据结构提供统一的访问机制。任何数据结构只要部署Iterator接口，就可以完成遍历操作（即依次处理该数据结构的所有成员）。
+
+Iterator 的作用有三个：一是为各种数据结构，提供一个统一的、简便的访问接口；二是使得数据结构的成员能够按某种次序排列；三是ES6创造了一种新的遍历命令for...of循环，Iterator接口主要供for...of消费
+
+Iterator 的遍历过程是这样的。
+1）创建一个指针对象，指向当前数据结构的起始位置。也就是说，遍历器对象本质上，就是一个指针对象
+2）第一次调用指针对象的next方法，可以将指针指向数据结构的第一个成员。
+3）第二次调用指针对象的next方法，指针就指向数据结构的第二个成员。
+4）不断调用指针对象的next方法，直到它指向数据结构的结束位置。
+
+
+Iterator 接口的目的，就是为所有数据结构，提供了一种统一的访问机制，即for...of循环。
+当使用for...of循环遍历某种数据结构时，该循环会自动去寻找 Iterator 接口。
+
+一种数据结构只要部署了 Iterator 接口，我们就称这种数据结构是”可遍历的“（iterable）。
+
+ES6 规定，默认的 Iterator 接口部署在数据结构的Symbol.iterator属性，或者说，一个数据结构只要具有Symbol.iterator属性，就可以认为是“可遍历的”（iterable）。
+Symbol.iterator属性本身是一个函数，就是当前数据结构默认的遍历器生成函数。执行这个函数，就会返回一个遍历器。
+至于属性名Symbol.iterator，它是一个表达式，返回Symbol对象的iterator属性，这是一个预定义好的、类型为 Symbol 的特殊值，所以要放在方括号内
+
+在ES6中，有3类数据结构原声具备Iterator接口：数组、某些类似数组的对象，以及Set和Map结构
+
+一个对象如果要有可被for...of循环调用的Iterator接口，就必须在Symbol.iterator属性上部署遍历器生成方法
+class RangeIterator{
+  [Symbol.iterator](){return this;} 
+  next(){}
+}
+
+
+
+调用 Iterator 接口的场合
+解构赋值
+对数组和 Set 结构进行解构赋值时，会默认调用Symbol.iterator方法。
+let set = new Set().add('a').add('b').add('c');
+let [x,y] = set;
+// x='a'; y='b'
+let [first, ...rest] = set;
+// first='a'; rest=['b','c'];
+
+
+扩展运算符
+扩展运算符（...）也会调用默认的 Iterator 接口。
+// 例一
+var str = 'hello';
+[...str] //  ['h','e','l','l','o']
+// 例二
+let arr = ['b', 'c'];
+['a', ...arr, 'd']
+// ['a', 'b', 'c', 'd']
+
+
+yield*
+yield*后面跟的是一个可遍历的结构，它会调用该结构的遍历器接口。
+let generator = function* () {
+  yield 1;
+  yield* [2,3,4];
+  yield 5;
+};
+var iterator = generator();
+iterator.next() // { value: 1, done: false }
+iterator.next() // { value: 2, done: false }
+iterator.next() // { value: 3, done: false }
+iterator.next() // { value: 4, done: false }
+iterator.next() // { value: 5, done: false }
+iterator.next() // { value: undefined, done: true }
+
+字符串的 Iterator 接口
+字符串是一个类似数组的对象，也原生具有 Iterator 接口。
+var someString = "hi";
+typeof someString[Symbol.iterator]
+// "function"
+var iterator = someString[Symbol.iterator]();
+iterator.next()  // { value: "h", done: false }
+iterator.next()  // { value: "i", done: false }
+iterator.next()  // { value: undefined, done: true }
+
+
+Iterator接口与Generator函数
+Symbol.iterator方法的最简单实现，还是使用下一章要介绍的Generator函数。
+var myIterable = {};
+myIterable[Symbol.iterator] = function* () {
+  yield 1;
+  yield 2;
+  yield 3;
+};
+[...myIterable] // [1, 2, 3]
+// 或者采用下面的简洁写法
+let obj = {
+  * [Symbol.iterator]() {
+    yield 'hello';
+    yield 'world';
+  }
+};
+for (let x of obj) {
+  console.log(x);
+}
+// hello
+// world
+
+
+遍历器对象的return()，throw()
+遍历器对象除了具有next方法，还可以具有return方法和throw方法。如果你自己写遍历器对象生成函数，那么next方法是必须部署的，return方法和throw方法是否部署是可选的。
+return方法的使用场合是，如果for...of循环提前退出（通常是因为出错，或者有break语句或continue语句），就会调用return方法。如果一个对象在完成遍历前，需要清理或释放资源，就可以部署return方法。
+function readLinesSync(file) {
+  return {
+    next() {
+      if (file.isAtEndOfFile()) {
+        file.close();
+        return { done: true };
+      }
+    },
+    return() {
+      file.close();
+      return { done: true };
+    },
+  };
+}
+
+
+for...of循环
+一个数据结构只要部署了Symbol.iterator属性，就被视为具有iterator接口，就可以用for...of循环遍历它的成员。也就是说，for...of循环内部调用的是数据结构的Symbol.iterator方法。
+
+数组原生具备iterator接口（即默认部署了Symbol.iterator属性），for...of循环本质上就是调用这个接口产生的遍历器，可以用下面的代码证明。
+
+Set 和 Map 结构也原生具有 Iterator 接口，可以直接使用for...of循环。
+
+
+计算生成的数据结构
+有些数据结构是在现有数据结构的基础上，计算生成的。比如，ES6的数组、Set、Map 都部署了以下三个方法，调用后都返回遍历器对象。
+entries() 返回一个遍历器对象，用来遍历[键名, 键值]组成的数组。对于数组，键名就是索引值；对于 Set，键名与键值相同。Map 结构的 Iterator 接口，默认就是调用entries方法。
+keys() 返回一个遍历器对象，用来遍历所有的键名。
+values() 返回一个遍历器对象，用来遍历所有的键值。
+这三个方法调用后生成的遍历器对象，所遍历的都是计算生成的数据结构。
+let arr = ['a', 'b', 'c'];
+for (let pair of arr.entries()) {
+  console.log(pair);
+}
+// [0, 'a']
+// [1, 'b']
+// [2, 'c']
+
+
+类似数组的对象
+
+
+for...in循环有几个缺点。
+数组的键名是数字，但是for...in循环是以字符串作为键名“0”、“1”、“2”等等。
+for...in循环不仅遍历数字键名，还会遍历手动添加的其他键，甚至包括原型链上的键。
+某些情况下，for...in循环会以任意顺序遍历键名。
+总之，for...in循环主要是为遍历对象而设计的，不适用于遍历数组
+
+
+for...of循环相比上面几种做法，有一些显著的优点。
+for (let value of myArray) {
+  console.log(value);
+}
+有着同for...in一样的简洁语法，但是没有for...in那些缺点。
+不同于forEach方法，它可以与break、continue和return配合使用。
+提供了遍历所有数据结构的统一操作接口。
+
+
+
+
+
+第十五章
+generator函数
+Generator 函数是 ES6 提供的一种异步编程解决方案，语法行为与传统函数完全不同。
+
+Generator 函数有多种理解角度。从语法上，首先可以把它理解成，Generator 函数是一个状态机，封装了多个内部状态。
+
+执行 Generator 函数会返回一个遍历器对象，也就是说，Generator 函数除了状态机，还是一个遍历器对象生成函数。返回的遍历器对象，可以依次遍历 Generator 函数内部的每一个状态。
+
+形式上，Generator 函数是一个普通函数，但是有两个特征。一是，function关键字与函数名之间有一个星号；二是，函数体内部使用yield表达式，定义不同的内部状态（yield在英语里的意思就是“产出”）。
+
+
+function* helloWorldGenerator() {
+  yield 'hello';
+  yield 'world';
+  return 'ending';
+}
+var hw = helloWorldGenerator();
+上面代码定义了一个 Generator 函数helloWorldGenerator，它内部有两个yield表达式（hello和world），即该函数有三个状态：hello，world 和 return 语句（结束执行）。
+
+然后，Generator 函数的调用方法与普通函数一样，也是在函数名后面加上一对圆括号。不同的是，调用 Generator 函数后，该函数并不执行，返回的也不是函数运行结果，而是一个指向内部状态的指针对象
+
+下一步，必须调用遍历器对象的next方法，使得指针移向下一个状态。也就是说，每次调用next方法，内部指针就从函数头部或上一次停下来的地方开始执行，直到遇到下一个yield表达式（或return语句）为止。换言之，Generator 函数是分段执行的，yield表达式是暂停执行的标记，而next方法可以恢复执行。
+
+hw.next()
+// { value: 'hello', done: false }
+hw.next()
+// { value: 'world', done: false }
+hw.next()
+// { value: 'ending', done: true }
+hw.next()
+// { value: undefined, done: true }
+
+
+yield 表达式
+由于 Generator 函数返回的遍历器对象，只有调用next方法才会遍历下一个内部状态，所以其实提供了一种可以暂停执行的函数。yield表达式就是暂停标志。
+
+遍历器对象的next方法的运行逻辑如下。
+（1）遇到yield表达式，就暂停执行后面的操作，并将紧跟在yield后面的那个表达式的值，作为返回的对象的value属性值。
+（2）下一次调用next方法时，再继续往下执行，直到遇到下一个yield表达式。
+（3）如果没有再遇到新的yield表达式，就一直运行到函数结束，直到return语句为止，并将return语句后面的表达式的值，作为返回的对象的value属性值。
+（4）如果该函数没有return语句，则返回的对象的value属性值为undefined。
+需要注意的是，yield表达式后面的表达式，只有当调用next方法、内部指针指向该语句时才会执行，因此等于为 JavaScript 提供了手动的“惰性求值”（Lazy Evaluation）的语法功能。
+
+function* gen() {
+  yield  123 + 456;
+}
+上面代码中，yield后面的表达式123 + 456，不会立即求值，只会在next方法将指针移到这一句时，才会求值。
+
+yield表达式与return语句既有相似之处，也有区别。相似之处在于，都能返回紧跟在语句后面的那个表达式的值。区别在于每次遇到yield，函数暂停执行，下一次再从该位置继续向后执行，而return语句不具备位置记忆的功能。一个函数里面，只能执行一次（或者说一个）return语句，但是可以执行多次（或者说多个）yield表达式。正常函数只能返回一个值，因为只能执行一次return；Generator 函数可以返回一系列的值，因为可以有任意多个yield。从另一个角度看，也可以说 Generator 生成了一系列的值，这也就是它的名称的来历（英语中，generator 这个词是“生成器”的意思）。
+
+Generator 函数可以不用yield表达式，这时就变成了一个单纯的暂缓执行函数。
+function* f() {
+  console.log('执行了！')
+}
+var generator = f();
+setTimeout(function () {
+  generator.next()
+}, 2000);
+上面代码中，函数f如果是普通函数，在为变量generator赋值时就会执行。但是，函数f是一个 Generator 函数，就变成只有调用next方法时，函数f才会执行。
+
+yield表达式只能用在 Generator 函数里面，用在其他地方都会报错。
+yield表达式如果用在另一个表达式之中，必须放在圆括号里面
+
+
+
