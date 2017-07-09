@@ -4512,3 +4512,87 @@ finally方法用于指定不管Promise对象最后状态如何，都会执行的
 
 
 
+
+第十七章
+异步操作和async函数
+js是单线程，需要异步编程
+es6之前异步编程：
+1，回调函数
+2，事件监听
+3，发布/订阅
+4，promise对象
+
+异步，将一个任务分成两段，先执行第一段，然后转而执行其他任务，等做好后再回头执行第二段
+nodejs约定回调函数第一个参数必须是错误对象err（如果没有错误，该参数就是null）
+执行分成两段，在这两段之间抛出的错误程序无法捕捉，只能当做参数传入第二段
+
+promise是为了解决回调函数多重嵌套问题，但代码冗余
+
+generator
+协程（意思是多个线程互相协作，完成异步任务）
+1.协程A开始执行
+2.协程A执行到一半，暂停，执行权转移至协程B
+3.一段时间后，协程B交还执行权
+4.协程A恢复执行
+
+function asyncJob(){
+	var f=yield readFile(fileA)
+}
+yield命令表示到此处执行权交给其他协程，yield命令是异步两个阶段的分界线
+协程遇到yield命令就暂停，等执行权返回，再从暂停的地方继续往后执行
+
+generator函数是协程在ES6种的实现，特点是可以交出函数的执行权（暂停执行）
+整个generator函数就是一个封装的异步任务，或者说是异步任务的容器
+
+next方法的作用是分阶段执行generator函数，每次调用next方法，会返回一个对象，表示当前阶段的信息（value属性和done属性）
+value属性是yield语句后表达式的值，表示当前阶段的值；
+done属性是一个布尔值，表示generator函数是否执行完毕
+
+next方法返回值的value属性，是generator函数向外输出数据
+next方法还可以接受参数，这是向generator函数体内输入数据
+
+generator函数内部还可以部署错误处理代码，捕获函数体外抛出的错误（try catch）
+
+
+thunk函数
+参数的求值策略
+传值调用，在进入函数体前就计算x+1的值，再将这个值传入函数f，C语言采用这种策略
+（如果参数求值时实际上尚未用到这个参数，可能造成性能损失）
+传名调用，直接将x+1传入函数体，用到的时候再求值，Haskell语言采用这种策略
+
+编译器的“传名调用”实现一般是先将参数放到一个临时函数中，再将这个临时函数传入函数体。
+这个临时函数就叫做thunk函数
+
+function f(m){ return m*2 }
+f(x+1)
+等同于
+var thunk=function(){ return x+1; }
+function f(thunk){ return thunk()*2; }
+
+js是传值调用，thunk函数替换的不是表达式，而是多参数函数，它将其替换成单参数的版本，且只接受回调函数作为参数
+
+多参数版本
+fs.readFile(fileName,callback)
+
+单参数版本
+var readFileThunk=Thunk(fileName);
+readFileThunk(callback);
+var Thunk=function(fileName){
+	return function(callback){
+		return fs.readFile(fileName,callback);
+	}
+}
+
+任何函数，只要参数有回调函数，就能写成thunk函数的形式
+thunk函数转换器
+var Thunk=function(fn){
+	return function(){
+		var args=Array.prototype.slice.call(arguments);
+		return function(callback){
+			args.push(callback);
+			return fn.apply(this,args);
+		};
+	};
+};
+
+
