@@ -122,7 +122,77 @@ node简介
         .json文件。通过fs模块同步读取文件后，同JSON.parse()解析返回结果
         其余扩展名，都被当做.js文件载入
         每一个编译成功的模块都会将其文件路径作为索引缓存在Module._cache对象上，以提高二次引入的性能
-        根据不同的文件扩展名，node会调用不同的读取方法
+        根据不同的文件扩展名，node会调用不同的读取方法，如.json文件的调用如下：
+            Module._extension['.json'] = function(module, filename){
+              var content = NativeModule.require('fs').readFileSync(filename, 'utf8');
+              try {
+                module.exports = JSON.parse(stripBOM(content));
+              } catch(e) {
+                e.message = filename + ':' + e.message;
+                throw e;
+              }
+            }
+            Module._extension会被赋值给require()的extensions属性，所以可以console.log(require.extensions);//{ '.js': [Function], '.json': [Function], '.node': [Function] }
+
+    确定文件扩展名后，node将调用具体的编译方式来将文件执行后返回给调用者
+      1.javascript模块的编译
+        在编译过程中，node对获取的JS文件内容进行了头尾包装。
+        在头部添加了(function (exports, require, module, __filename, __dirname) {\n, \n});
+        这样每个模块文件之间都进行了作用域隔离。包装后的代码会通过vm原生模块的runInThisContext()方法执行(类似eval，只是具有明确上下文，不污染全局)，返回一个具体的function对象。最后，将当前模块对象的exports属性、require方法、module（模块对象自身），以及在文件定位中得到的完整文件路径和文件目录作为参数传递给这个function执行
+        这就是这些变量并没有定义在每个模块文件中却存在的原因。在执行之后，模块的exports属性被返回了调用方。exports属性上的任何方法和属性都可以被外部调用到，但是模块中的其余变量或属性则不可直接被调用。
+        这就是node对commonjs模块规范的实现。
+        exports对象时通过形参的方式传入的，直接赋值形参会改变形参的引用，但不能改变作用域外的值（var a=10; !function(a){a=11;}(); a//10 ）
+      2.c/c++模块的编译
+        node调用process.dlopen()方法进行加载和执行。在node的架构下，dlopen()方法在windows和*nix平台下分别有不同的实现，通过libuv兼容层进行了封装。
+        实际上，.node的模块文件并不需要编译，因为它是编写c/c++模块后编译生成的，所以只有加载和执行的过程。在执行过程中，模块的exports对象与.node模块产生联系，然后返回给调用者。
+        c/c++模块给node使用者带来的优势主要是执行效率方面的，劣势则是c/c++模块的编写门槛高
+      3.JSON文件的编译
+        .json文件的编译是3中方式中最简单的。node利用fs模块同步读取JSON文件的内容之后，调用JSON.parse方法得到对象，然后将它赋值给模块对象的exports，以供外部调用
+        JSON文件在用作项目的配置文件时比较有用。如果你定义了一个JSON文件作为配置，就不必调用fs模块去异步读取和解析，直接调用require引入即可。能享受模块缓存的便利，二次引入没有性能影响
+
+2.3 核心模块
+    node的核心模块在编译成可执行文件的过程中被编译进了二进制文件。核心模块分为c/c++编写和js编写两部分，其中c/c++文件存放在node项目的src目录下，js放在lib目录下
+
+2.3.1 js核心模块的编译过程
+    1.转存为c/c++代码
+      node采用v8附带的js2c.py工具，将所有内置的js代码（src/node.js和lib/*.js）转换成c++里的数组，生产node_natives.h头文件
+      在这个过程，js代码以字符串的形式存储在node命名空间中，是不可直接执行的。在启动node进程时，js代码直接加载进内存中。在加载过程中，js核心模块经历标识符分析后直接定位到内存中，比普通的文件模块从磁盘中一出一出查要快很多。
+    2.编译js核心模块
+      lib目录下的所有模块文件也没有定义require、module、exports这些变量。在引入js核心模块过程中，也经历了头尾包装的过程，然后才执行和导出exports对象。与文件模块有区别的地方在于：获取源代码的方式（核心模块是内存中加载的)以及缓存执行结果的位置。
+      js核心模块的定义，源文件通过process.binding('natives')取出，编译成功的模块缓存到NativeModule._cache对象上，文件模块则缓存到Module._cache对象上：
+      function NativeModule(id) {
+        this.filename = id + '.js';
+        this.id = id;
+        this.exports = {};
+        this.loaded = false;
+      }
+      NativeModule._source = process.binding('natives');
+      NativeModule._cache = {};
+
+2.3.2 c/c++核心模块的编译过程
+    在核心模块中，有些模块全部由c/c++编写，有些模块则由c/c++完成核心部分，其他部分则由js实现包装或向外导出，以满足性能需求。c++为核心，JS实现封装的模式是node能够提高性能的常见方式。
+    纯c/c++编写的部分统一称为内建模块，因为它们通常不被用户直接调用。node的buffer、crypto、evals、fs、os等模块都是部分通过c/c++编写
+    1.内建模块的组织形式
+    struct node_module_struct {
+      int version;
+      void *dso_handle;
+      const char * filename;
+      void (*register_func) (v8::Handle<v8::Object> target);
+      const char *modname;
+    }      
+    每一个内建模块在定义之后，都通过NODE_MODULE宏将模块定义到node命名空间中，模块的具体初始化方法挂载为结构的register_func成员：
+    #define NODE_MODULE(modname, regfunc)
+      extern "C" {
+        NODE_MODULE_EXPORT node::node_module_struct modname ## _module =
+        {
+          NODE_STANDARD_MODULE_STUFF,
+          regfunc,
+          NODE_STRINGIFY(modname)
+        };
+      }
+      node_extensions.h文件将这些散列的内建模块统一放进了一个叫node_module_list的数组中，这些模块有node_buffer,node_crypto,node_evals,node_fs,...
+      node提供了get_builtin_module方法从node_module_list数组取出这些模块
+      内建模块
      
         
         
