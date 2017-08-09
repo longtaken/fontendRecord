@@ -192,7 +192,129 @@ node简介
       }
       node_extensions.h文件将这些散列的内建模块统一放进了一个叫node_module_list的数组中，这些模块有node_buffer,node_crypto,node_evals,node_fs,...
       node提供了get_builtin_module方法从node_module_list数组取出这些模块
-      内建模块
+      内建模块优势在于：本身由c/c++编写，性能优于脚本语言；在进行文件编译时，它们被编译进二进制文件。一旦node执行，它们被直接加载进内存中，无须再次做标识符定位、文件定位、编译等过程，直接可以执行
+    2.内建模块的导出
+      在node的所有模块类型中，存在（内建模块(c/c++)->核心模块(js)->文件模块）的依赖层级关系，文件模块可能会依赖核心模块，核心模块可能会依赖内建模块。
+      通常，不推荐文件模块直接调用内建模块。如需调用，直接调用核心模块即可，因为核心模块中基本都封装了内建模块
+      node在启动时，会生成一个全局变量process，并提供Binding()方法来协助加载内建模块
+      在加载内建模块时，先创建一个exports空对象，然后调用get_builtin_module方法取出内建模块对象，通过执行register_func填充exports对象，最后将exports对象按模块名缓存，并返回给调用方完成导出。
+
+2.3.3 核心模块的引入流程
+    os原生模块的引入流程
+    NODE_MODULE(node_os, reg_func) -> get_builtin_module('node_os') -> process.binding('os') -> NativeModule.require('os') -> require('os')  
+
+2.3.4 编写核心模块
+    核心模块被编译进二进制文件需要遵循一定规则
+    page26
+
+2.4 c/c++扩展模块
+    js的典型弱点是位运算，参照java的位运算实现，但是java位运算是int型数字的基础上进行，而js只有double型数据类型，再进行位运算过程中需要转成int型，所以js做位运算效率不高，需要编写c/c++扩展模块来提升性能
+
+2.4.1 前提条件
+    gyp项目生成工具
+    v8引擎c++库
+    libuv库
+    node内部库
+
+2.4.2 c/c++扩展模块的编写
+    普通的扩展模块与内建模块的区别在于无须将源代码编译进node，而是通过dlopen方法动态加载。
+    编写普通扩展模块时，无须将源代码编译进node命名空间，也不需要提供头文件
+
+2.4.3 c/c++扩展模块的编译
+    
+2.4.4 c/c++扩展模块的加载
+
+2.5 模块调用栈
+    
+2.6 包与NPM
+    
+2.6.1 包结构
+    包实际上是一个存档文件，即一个目录直接打包为.zip或tar.gz格式的文件，安装后解压还原目录。
+    完全符合commonjs规范的包目录应该包含
+    package.json：包描述文件
+    bin：用于存放可执行二进制文件的目录
+    lib：用于存放js代码的目录
+    doc：用于存放文档的目录
+    test：用于存放单元测试用例的代码
+
+2.6.2 包描述文件与NPM
+    name：包名，规范定义它需要由小写的字母和数字组成，可以包含.\_-，但不允许出现空格。包名必须是唯一的，以免对外公布时产生重名冲突的误解。不建议在包名中附带node或js重复标识它是js或node模块
+    description：包简介
+    version：版本号
+    keywords： 关键词数组，npm中用来做分类搜索
+    maintainers：包维护者列表，npm通过该属性进行权限认证
+    contributors：贡献者列表
+    bugs：一个可以反馈bug的网页地址或邮件地址
+    licenses：当前包所使用的许可证列表，表示这个包可以在哪些许可证下使用
+    repositories：托管源代码的位置列表，表明可以通过哪些方式和地址访问包的源代码
+    dependencies：使用当前包所需要依赖的包列表。npm会通过这个属性帮助自动加载依赖的包
+
+    可选
+    homepage：当前包的网站地址
+    os：操作系统支持列表
+    CPU：CPU架构的支持列表，arm mips ppc sparc x86 x86_64
+    engine：支持的js引擎列表，ejs flusspferd gpsee jsc spidermonkey narwhal node v8
+    builtin：标志当前包是否内建在底层系统的标准组件
+    directories：包目录说明
+    implements：实现规范的列表
+    scripts：脚本说明对象
+
+    在包规范的区别在于多了
+    author：包作者
+    bin：一些包做着希望包可以作为命令行工具使用。配置好bin字段后，通过npm i package_name -g命令可以将脚本添加到执行路径中，之后可以在命令行直接执行。node-gyp就是这样安装。
+    main：模块引入方法require在引入包时，会优先检查这个字段，并将其作为包中其余模块的入口，如果不存在这个字段，require会查找包目录下的index.js index.node index.json文件作为默认入口
+    devDependencies：一些模块只在开发是需要的依赖
+
+2.6.3 NPM常用功能
+    commonjs包规范是理论，npm是一种实践。npm至于node，相当于gem之于ruby，pear之于php。
+    1.查看帮助
+      npm help <command>查看具体命令
+      npm -v 版本
+    2.安装依赖包
+      npm install 安装好依赖包后，直接在代码调用require('xx')即可引入该包
+      全局安装
+        -g是将一个包安装为全局可用的执行命令。根据描述文件中bin字段配置，将实际脚本链接到与node可执行文件相同的路径下：'bin': {'express': './bin/express'}
+        通过全局模式安装的所有模块包都被安装进了一个统一的目录下，通过path.resolve(process.execPath,'..','..','lib','node_modules')推算出来
+        如果node可执行文件的位置是/user/local/bin/node，那么模块目录就是/usr/local/lib/node_module。通过软链接的方式将bin字段配置的可执行文件链接到node的可执行目录下
+      本地安装
+        本地安装只需为npm指明package.json文件所在的位置即可：它可以是一个包含package.json的存档文件，也可以是一个url地址，也可以是一个目录下package.json文件的目录位置
+      从非官方源安装
+        npm install underscore --registry=http://registry.url
+        指定默认源
+        npm config set registry http://registry.url
+    3.npm钩子命令
+      package.json中scripts字段让包安装或者卸载过程中提供钩子机制，'scripts': {'install':'install.js'}
+    4.发布包
+      编写模块
+        保存xx.js
+      初始化包描述文件
+        npm init，创建package.json文件
+      注册包仓库账号
+        注册账号命令是npm adduser
+      上传包
+        npm publish <folder> 在package.json目录下执行npm publish . 开始上传包
+      安装包
+        npm i xx
+      管理包权限
+        npm owner ls eventproxy
+        npm owner add eventproxy
+        npm owner rm eventproxy
+      分析包
+        npm ls
+
+2.6.4 局域npm
+    搭建自己的npm仓库
+
+2.6.5 npm潜在问题
+    包质量良莠不齐
+
+2.7 前后端共用模块
+    
+2.7.1 模块的侧重点
+    
+2.7.2 AMD规范
+    AMD规范是commonjs模块规范的一个延伸
+
      
         
         
